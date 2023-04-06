@@ -1,0 +1,147 @@
+from functools import partial
+from typing import Tuple, NamedTuple
+
+import jax
+import jax.numpy as jnp
+from jax import jit, vmap
+from jax.lax import scan, cond
+from trajax.optimizers import ILQR, ILQRHyperparams
+
+from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
+from cucrl.simulator.simulator_dynamics import SimulatorDynamics
+
+
+class _IntegrateCarry(NamedTuple):
+    x: jnp.ndarray
+    t: jnp.ndarray
+
+
+class BestPossibleDiscreteAlgorithm:
+    def __init__(self, simulator_dynamics: SimulatorDynamics, simulator_costs: SimulatorCostsAndConstraints,
+                 time_horizon: Tuple[float, float], num_nodes: int):
+        self.simulator_dynamics = simulator_dynamics
+        self.simulator_cost = simulator_costs
+        self.time_horizon = time_horizon
+        self.num_nodes = num_nodes
+
+        self.num_action_nodes = self.num_nodes - 1
+        self.dt = (self.time_horizon[1] - self.time_horizon[0]) / self.num_action_nodes
+
+        self.initial_actions = jnp.zeros(shape=(self.num_action_nodes, self.simulator_dynamics.control_dim))
+
+        self.num_low_steps = 300
+        self.time_span = self.dt
+
+        self.ilqr = ILQR(self.cost_fn, self.dynamics_fn)
+        self.ilqr_params = ILQRHyperparams(maxiter=100)
+
+        self.eval_dt = self.dt / self.num_low_steps
+
+    @partial(jit, static_argnums=(0))
+    def integrate(self, x: jax.Array, u: jax.Array, t: jax.Array) -> jax.Array:
+        _dt = self.time_span / self.num_low_steps
+
+        xt = _IntegrateCarry(x, t * self.dt)
+
+        def f(_xt: _IntegrateCarry, _):
+            x_dot = self.simulator_dynamics.dynamics(_xt.x, u, _xt.t.reshape(1, ))
+            x_next = _xt.x + x_dot * _dt
+            t_next = _xt.t + _dt
+            return _IntegrateCarry(x_next, t_next), None
+
+        xt_next, _ = scan(f, xt, None, length=self.num_low_steps)
+        return xt_next.x
+
+    def cost_fn(self, x, u, t, params=None):
+        assert x.shape == (self.simulator_dynamics.state_dim,) and u.shape == (self.simulator_dynamics.control_dim,)
+
+        def running_cost(x, u, t):
+            return self.dt * self.simulator_cost.running_cost(x, u)
+
+        def terminal_cost(x, u, t):
+            return self.simulator_cost.terminal_cost(x, u)
+
+        return cond(t == self.num_action_nodes, terminal_cost, running_cost, x, u, t)
+
+    def dynamics_fn(self, x, u, t, params=None):
+        assert x.shape == (self.simulator_dynamics.state_dim,) and u.shape == (self.simulator_dynamics.control_dim,)
+        return self.integrate(x, u, t)
+
+    def get_optimal_cost(self, initial_state):
+        out = self.ilqr.solve(None, None, initial_state, self.initial_actions, self.ilqr_params)
+
+        x_last, xs_all = self.rollout_eval(out.us, initial_state)
+
+        us_all = jnp.repeat(out.us[:, None, :], repeats=self.num_low_steps, axis=1)
+
+        xs_all = xs_all.reshape(-1, self.simulator_dynamics.state_dim)
+        us_all = us_all.reshape(-1, self.simulator_dynamics.control_dim)
+        xs_all = jnp.concatenate([initial_state[None, :], xs_all])
+
+        true_cost = self.cost_fn_eval(xs_all, us_all)
+        return true_cost
+
+    # Evaluation functions
+    @partial(jit, static_argnums=(0,))
+    def integrate_eval(self, x: jax.Array, u: jax.Array, t: jax.Array):
+        _dt = self.time_span / self.num_low_steps
+
+        xt = _IntegrateCarry(x, t * self.dt)
+
+        def f(_xt: _IntegrateCarry, _):
+            x_dot = self.simulator_dynamics.dynamics(_xt.x, u, _xt.t.reshape(1, ))
+            x_next = _xt.x + x_dot * _dt
+            t_next = _xt.t + _dt
+            return _IntegrateCarry(x_next, t_next), x_next
+
+        xt_next, xs_next = scan(f, xt, None, length=self.num_low_steps)
+        return xt_next.x, xs_next
+
+    def dynamics_fn_eval(self, x, u, t):
+        assert x.shape == (self.simulator_dynamics.state_dim,) and u.shape == (self.simulator_dynamics.control_dim,)
+        return self.integrate_eval(x, u, t)
+
+    def rollout_eval(self, U, x0):
+        ts = jnp.arange(self.num_action_nodes)
+
+        inputs = (U, ts)
+
+        def dynamics_for_scan(x, _inputs):
+            u, t = _inputs
+            x_next, xs_next = self.dynamics_fn_eval(x, u, t)
+            return x_next, xs_next
+
+        return scan(dynamics_for_scan, x0, inputs)
+
+    def running_cost_eval(self, x, u):
+        return self.eval_dt * self.simulator_cost.running_cost(x, u)
+
+    def terminal_cost_eval(self, x, u):
+        return self.simulator_cost.terminal_cost(x, u)
+
+    def cost_fn_eval(self, xs, us):
+        _running_cost = jnp.sum(vmap(self.running_cost_eval)(xs[:-1], us))
+        _terminal_cost = self.terminal_cost_eval(xs[-1], us[-1])
+        return _running_cost + _terminal_cost
+
+
+if __name__ == "__main__":
+    from jax.config import config
+
+    config.update("jax_enable_x64", True)
+    from cucrl.simulator.simulator_dynamics import Pendulum as PendulumDynamics
+    from cucrl.simulator.simulator_costs import Pendulum as PendulumCosts
+
+    state_scaling = jnp.diag(jnp.array([1.0, 2.0]))
+    control_scaling = jnp.eye(1)
+    time_scaling = jnp.ones(shape=(1,))
+
+    simulator_dynamics = PendulumDynamics(state_scaling=state_scaling, control_scaling=control_scaling,
+                                          time_scaling=time_scaling)
+    simulator_costs = PendulumCosts(state_scaling=state_scaling, control_scaling=control_scaling,
+                                    time_scaling=time_scaling)
+
+    best_possible_algorithm = BestPossibleDiscreteAlgorithm(simulator_dynamics, simulator_costs, time_horizon=(0, 10),
+                                                            num_nodes=11)
+
+    print(best_possible_algorithm.get_optimal_cost(jnp.array([jnp.pi / 2, 0.0])))
