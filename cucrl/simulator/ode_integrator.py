@@ -112,11 +112,13 @@ class Integrator:
         vis_data = self.evaluate(vis_ts, sim_data)
 
         key, subkey = random.split(key)
-        noise = sigma * random.normal(key=subkey, shape=obs_data.xs.shape, dtype=jnp.float64)
-        ys_obs = obs_data.xs + noise
+        noise = sigma * random.normal(key=subkey, shape=obs_data.xs_dot.shape, dtype=jnp.float64)
+        xs_dot_noise = obs_data.xs_dot + noise
 
-        obs_traj = Trajectory(obs_data.ts.reshape(-1), ys_obs, obs_data.us, obs_data.xs, obs_data.xs_dot)
-        vis_traj = Trajectory(vis_data.ts.reshape(-1), vis_data.xs, vis_data.us, vis_data.xs, vis_data.xs_dot)
+        obs_traj = Trajectory(ts=obs_data.ts.reshape(-1), us=obs_data.us, xs=obs_data.xs, xs_dot_true=obs_data.xs_dot,
+                              xs_dot_noise=xs_dot_noise)
+        vis_traj = Trajectory(ts=vis_data.ts.reshape(-1), us=vis_data.us, xs=vis_data.xs, xs_dot_true=vis_data.xs_dot,
+                              xs_dot_noise=vis_data.xs_dot)
 
         return obs_traj, vis_traj, sim_data.measurement_selection
 

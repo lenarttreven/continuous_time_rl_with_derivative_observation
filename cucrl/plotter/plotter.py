@@ -90,32 +90,14 @@ class Plotter:
         figure_smoother_states, ax_states = plt.subplots(num_traj, self.state_dim + self.action_dim, figsize=(
             5 * (self.state_dim + self.action_dim) + 4, 4 * num_traj))
         ax_states = ax_states.reshape(num_traj, self.state_dim + self.action_dim)
-        state_stds = jnp.sqrt(jnp.clip(data.smoother_state_vars, a_min=0))
-        values_lower = data.smoother_state_means - 1.960 * state_stds
-        values_upper = data.smoother_state_means + 1.960 * state_stds
         print(colored('Plot smoother states', 'green'))
         self._create_plot(axs=ax_states, plot_times=data.visualization_times,
-                          plot_values=data.smoother_state_means, plot_values_lower=values_lower,
-                          plot_values_upper=values_upper, q=95, statistics_type=Statistics.MEAN,
-                          observation_times=data.observation_times, observations=data.observations,
+                          plot_values=None, plot_values_lower=None,
+                          plot_values_upper=None, q=95, statistics_type=Statistics.MEAN,
+                          observation_times=None, observations=None,
                           gt_times=data.visualization_times, gt_values=data.gt_states_vis, space=Space.STATE,
                           prediction_states=data.prediction_states, actual_actions=data.actual_actions,
                           predicted_actions=data.predicted_actions)
-
-        # Plot smoother derivatives
-        figure_smoother_der, ax_derivatives = plt.subplots(num_traj, self.state_dim,
-                                                           figsize=(5 * self.state_dim + 4, 4 * num_traj))
-        ax_derivatives = ax_derivatives.reshape(num_traj, self.state_dim)
-
-        derivative_stds = jnp.sqrt(jnp.clip(data.smoother_der_vars, a_min=0))
-        derivative_values_lower = data.smoother_der_means - 1.960 * derivative_stds
-        derivative_values_upper = data.smoother_der_means + 1.960 * derivative_stds
-        print(colored('Plot smoother derivatives', 'green'))
-        self._create_plot(axs=ax_derivatives, plot_times=data.visualization_times,
-                          plot_values=data.smoother_der_means, plot_values_lower=derivative_values_lower,
-                          plot_values_upper=derivative_values_upper, q=95, statistics_type=Statistics.MEAN,
-                          observations=None, observation_times=None, gt_times=data.visualization_times,
-                          gt_values=data.gt_der_vis, space=Space.DERIVATIVE)
 
         # Plot dynamics derivatives
         figure_dynamics_der, ax_dynamics = plt.subplots(num_traj, self.state_dim,
@@ -129,16 +111,16 @@ class Plotter:
         self._create_plot(axs=ax_dynamics, plot_times=data.visualization_times,
                           plot_values=data.dynamics_der_means, plot_values_lower=dynamics_values_lower,
                           plot_values_upper=dynamics_values_upper, q=95, statistics_type=Statistics.MEAN,
-                          observation_times=None, observations=None, gt_times=data.visualization_times,
-                          gt_values=data.gt_der_vis, space=Space.DERIVATIVE)
-        return figure_smoother_states, figure_smoother_der, figure_dynamics_der
+                          observation_times=data.observation_times, observations=data.observations,
+                          gt_times=data.visualization_times, gt_values=data.gt_der_vis, space=Space.DERIVATIVE)
+        return figure_dynamics_der, figure_smoother_states
 
-    def _create_plot(self, axs, plot_times: jax.Array, plot_values: jax.Array, plot_values_lower: jax.Array,
-                     plot_values_upper: jax.Array, q: float, statistics_type: Statistics,
-                     observation_times: Optional[List[jnp.array]], observations: Optional[List[jnp.array]],
-                     gt_times: jax.Array, gt_values: jax.Array, space: Space = Space.STATE,
-                     prediction_states: jax.Array | None = None, actual_actions: jax.Array | None = None,
-                     predicted_actions: jax.Array | None = None):
+    def _create_plot(self, axs, plot_times: jax.Array | None, plot_values: jax.Array | None,
+                     plot_values_lower: jax.Array | None, plot_values_upper: jax.Array | None, q: float,
+                     statistics_type: Statistics, observation_times: Optional[List[jnp.array]],
+                     observations: Optional[List[jnp.array]], gt_times: jax.Array, gt_values: jax.Array,
+                     space: Space = Space.STATE, prediction_states: jax.Array | None = None,
+                     actual_actions: jax.Array | None = None, predicted_actions: jax.Array | None = None):
 
         num_trajectories = len(plot_times)
 
@@ -152,10 +134,15 @@ class Plotter:
                 obs_times = None if observation_times is None else observation_times[trajectory]
                 obs = None if observations is None else observations[trajectory][:, dimension]
                 pred = None if prediction_states is None else prediction_states[trajectory][:, dimension]
-                self._add_prediction_on_plot(ax=ax, plot_times=plot_times[trajectory],
-                                             plot_values=plot_values[trajectory][:, dimension],
-                                             plot_values_lower=plot_values_lower[trajectory][:, dimension],
-                                             plot_values_upper=plot_values_upper[trajectory][:, dimension],
+                cur_plot_times = None if plot_times is None else plot_times[trajectory]
+                cur_plot_values = None if plot_values is None else plot_values[trajectory][:, dimension]
+                cur_plot_values_lower = None if plot_values_lower is None else plot_values_lower[trajectory][:,
+                                                                               dimension]
+                cur_plot_values_upper = None if plot_values_upper is None else plot_values_upper[trajectory][:,
+                                                                               dimension]
+                self._add_prediction_on_plot(ax=ax, plot_times=cur_plot_times, plot_values=cur_plot_values,
+                                             plot_values_lower=cur_plot_values_lower,
+                                             plot_values_upper=cur_plot_values_upper,
                                              q=q, statistics_type=statistics_type, observation_times=obs_times,
                                              observations=obs, prediction_states=pred)
                 ax.set_xlabel(r"t")

@@ -16,9 +16,9 @@ from termcolor import colored
 
 from cucrl.dynamics_with_control.dynamics_models import get_dynamics
 from cucrl.environment_interactor.get_interactor import get_interactor
-from cucrl.main.config import RunConfig, SmootherConfig, DynamicsConfig, OptimizersConfig, DataGenerationConfig
+from cucrl.main.config import RunConfig, DynamicsConfig, OptimizersConfig, DataGenerationConfig
 from cucrl.main.data_stats import DataLoader
-from cucrl.main.data_stats import DataStats, Normalizer, DataLearn, DynamicsData, Stats, SmoothingData, MatchingData
+from cucrl.main.data_stats import DataStats, Normalizer, DataLearn, DynamicsData, Stats
 from cucrl.main.handlers import DataGenerator, DynamicsDataManager
 from cucrl.main.handlers import Keys, DataRepr, VisualisationData
 from cucrl.objectives.objectives import Objectives
@@ -26,10 +26,8 @@ from cucrl.offline_planner.offline_planner import get_offline_planner
 from cucrl.optimal_cost.best_possible_discrete_time import BestPossibleDiscreteAlgorithm
 from cucrl.optimal_cost.optimal_cost import OptimalCost
 from cucrl.plotter.plotter import Plotter
-from cucrl.schedules.betas import get_betas
 from cucrl.schedules.learning_rate import get_learning_rate
 from cucrl.simulator.simulator_costs import get_simulator_costs
-from cucrl.smoother.smoother import SmootherFactory
 from cucrl.utils.classes import MeasurementSelection
 from cucrl.utils.classes import PlotData, PlotOpenLoop, OfflinePlanningData, DynamicsModel, NumberTrainPoints
 from cucrl.utils.helper_functions import AngleLayerDynamics, BetaExploration
@@ -57,9 +55,9 @@ class LearnSystem:
         angles_shape = self.angle_layer.angle_layer(jnp.ones(shape=(self.state_dim,))).shape
         init_stats_after_angle_layer = Stats(jnp.zeros(shape=angles_shape), jnp.ones(shape=angles_shape))
 
-        self.data_stats = DataStats(ic_stats=init_stats_state, ts_stats=init_stats_time, ys_stats=init_stats_state,
-                                    xs_stats=init_stats_state, us_stats=init_stats_control,
-                                    dot_xs_stats=init_stats_state, xs_after_angle_layer=init_stats_after_angle_layer)
+        self.data_stats = DataStats(ts_stats=init_stats_time, xs_stats=init_stats_state, us_stats=init_stats_control,
+                                    xs_dot_noise_stats=init_stats_state,
+                                    xs_after_angle_layer=init_stats_after_angle_layer)
         # Prepare pool for vector field data
         self.vector_field_data = DynamicsDataManager(self.state_dim, self.control_dim)
         self.simulator_costs = get_simulator_costs(config.data_generation.simulator_type,
@@ -73,8 +71,6 @@ class LearnSystem:
                                        no_batching=config.optimizers.no_batching)
         # Prepare black box data
         self.offline_planning_data = None
-        # Prepare smoother model.
-        self._prepare_smoother(config.smoother)
         # Prepare dynamics
         self.dynamics_config = config.dynamics
         self._prepare_dynamics(self.dynamics_config)
@@ -86,8 +82,6 @@ class LearnSystem:
         self._prepare_controller(self.interaction, config.data_generation.initial_conditions)
         # Prepare data generator
         self.data_generator = DataGenerator(data_generation=config.data_generation, interactor=self.policy)
-        # Prepare betas
-        self._prepare_betas(config.betas)
         # Initialize parameters
         self._initialize_parameters()
         # Prepare plotter
@@ -128,16 +122,6 @@ class LearnSystem:
         self.time_horizon = data_generation.time_horizon
         self.noise_stds = data_generation.noise
 
-    def _prepare_betas(self, betas):
-        self.betas_joint_training = get_betas(betas.type, betas.kwargs)
-
-    def _prepare_smoother(self, smoother: SmootherConfig):
-        time_smoother = time.time()
-        self.smoother = SmootherFactory().make_smoother(smoother_type=smoother.type, smoother_config=smoother,
-                                                        state_dim=self.state_dim, noise_stds=self.noise_stds,
-                                                        normalizer=self.normalizer)
-        print("Time for smoother preparation: ", time.time() - time_smoother)
-
     def _prepare_dynamics(self, dynamics: DynamicsConfig):
         time_dynamics = time.time()
         self.dynamics = get_dynamics(dynamics_model=dynamics.type, state_dim=self.state_dim,
@@ -160,30 +144,21 @@ class LearnSystem:
 
         # Initialize parameters
         params_dynamics, stats_dynamics = self.dynamics.initialize_parameters(keys[0])
-        params_smoother, stats_smoother = self.smoother.initialize_parameters(keys[1])
 
-        self.parameters = {"smoother": params_smoother, "dynamics": params_dynamics}
-        self.stats = {'smoother': stats_smoother, 'dynamics': stats_dynamics}
+        self.parameters = {"dynamics": params_dynamics}
+        self.stats = {'dynamics': stats_dynamics}
 
         self.old_parameters = copy.deepcopy(self.parameters)
         self.old_stats = copy.deepcopy(self.stats)
 
         # Count number of parameters of the model
         self.num_dynamics_parameters = 0
-        self.num_smoother_parameters = 0
 
         for leave in tree_leaves(params_dynamics):
             self.num_dynamics_parameters += leave.size
-        for leave in tree_leaves(params_smoother):
-            self.num_smoother_parameters += leave.size
 
-        self.num_parameters = self.num_smoother_parameters + self.num_dynamics_parameters
+        self.num_parameters = self.num_dynamics_parameters
         print("Time to initialize parameters", time.time() - time_parameters)
-
-    def _reset_parameters_smoother(self, key):
-        params_smoother, states_smoother = self.smoother.initialize_parameters(key)
-        self.parameters['smoother'] = params_smoother
-        self.stats['smoother'] = states_smoother
 
     def _reset_parameters_dynamics(self, key):
         params_dynamics, states_dynamics = self.dynamics.initialize_parameters(key)
@@ -193,16 +168,10 @@ class LearnSystem:
     def _prepare_objectives(self):
         time_objective_builder = time.time()
         # Build objectives - learn_dynamics and optimize_policy
-        objectives = Objectives(smoother=self.smoother, dynamics=self.dynamics)
+        objectives = Objectives(dynamics=self.dynamics)
 
-        self.pretraining_smoother = objectives.pretraining_smoother
-        self.pretraining_dynamics = objectives.pretraining_dynamics
-        self.joint_training = objectives.joint_training
-
-        self.values_and_grad_pretraining_smoother = jit(value_and_grad(self.pretraining_smoother, 0, has_aux=True))
-        self.values_and_grad_pretraining_dynamics = jit(value_and_grad(self.pretraining_dynamics, 0, has_aux=True))
-        self.values_and_grad_joint_training = jit(value_and_grad(self.joint_training, 0, has_aux=True))
-
+        self.dynamics_training = objectives.dynamics_training
+        self.values_and_grad_dynamics_training = jit(value_and_grad(self.dynamics_training, 0, has_aux=True))
         print("Time to prepare objective builder", time.time() - time_objective_builder)
 
     def _prepare_offline_planner(self):
@@ -217,83 +186,29 @@ class LearnSystem:
 
     def _prepare_optimizer(self, optimizer: OptimizersConfig):
         # Prepare learning rate
-        self.learning_rate_pretraining_smoother = get_learning_rate(
-            optimizer.pretraining_smoother.learning_rate.type,
-            optimizer.pretraining_smoother.learning_rate.kwargs)
-        self.learning_rate_pretraining_dynamics = get_learning_rate(
-            optimizer.pretraining_dynamics.learning_rate.type,
-            optimizer.pretraining_dynamics.learning_rate.kwargs)
-        self.learning_rate_joint_training = get_learning_rate(
-            optimizer.joint_training.learning_rate.type,
-            optimizer.joint_training.learning_rate.kwargs)
+        self.learning_rate_dynamics_training = get_learning_rate(
+            optimizer.dynamics_training.learning_rate.type,
+            optimizer.dynamics_training.learning_rate.kwargs)
         # Prepare optimizer for learning dynamics
-        if optimizer.pretraining_smoother.type == Optimizer.ADAM:
-            self.optimizer_pretraining_smoother = optax.adamw
-        elif optimizer.pretraining_smoother.type == Optimizer.SGD:
-            self.optimizer_pretraining_smoother = optax.sgd
-        if optimizer.pretraining_dynamics.type == Optimizer.ADAM:
-            self.optimizer_pretraining_dynamics = optax.adamw
-        elif optimizer.pretraining_dynamics.type == Optimizer.SGD:
-            self.optimizer_pretraining_dynamics = optax.sgd
-
-        if optimizer.joint_training.type == Optimizer.ADAM:
-            self.optimizer_joint_training = optax.adamw
-        elif optimizer.joint_training.type == Optimizer.SGD:
-            self.optimizer_joint_training = optax.sgd
+        if optimizer.dynamics_training.type == Optimizer.ADAM:
+            self.optimizer_dynamics_training = optax.adamw
+        elif optimizer.dynamics_training.type == Optimizer.SGD:
+            self.optimizer_dynamics_training = optax.sgd
 
     def generate_data(self) -> Tuple[DataRepr, MeasurementSelection]:
         # Generate noisy trajectories following the dynamics with the given policy
         self.data_generation_key, key = random.split(self.data_generation_key)
         return self.data_generator.generate_trajectories(key)
 
-    def prepare_pretraining_smoother(self):
+    def prepare_dynamics_training(self):
         if self.track_wandb:
             wandb.define_metric("x_axis/step")
             # set all other train/ metrics to use this step
-            wandb.define_metric("Smoother pretraining/*", step_metric="x_axis/step", summary="last")
-            wandb.define_metric('Smoother pretraining/iter_time', step_metric="x_axis/step", summary='mean')
-        tx_smoother_pretraining = self.optimizer_pretraining_smoother(
-            self.learning_rate_pretraining_smoother,
-            weight_decay=self.config.optimizers.pretraining_smoother.wd)
-
-        def prepare_parameters_and_stats(key):
-            # Reset smoother and dynamics parameters
-            key, subkey = jax.random.split(key)
-            self._reset_parameters_smoother(subkey)
-            # Split parameters to trainable parameters and policy parameters
-            params_train = {'smoother': self.parameters['smoother']}
-            stats_train = {'smoother': self.stats['smoother']}
-            # Watch trainable parameters with the optimizer
-            opt_state = tx_smoother_pretraining.init(params_train)
-            return params_train, stats_train, opt_state
-
-        # Define optimization step
-        @jit
-        def do_step(step, parameters, stats, opt_state, data, data_stats, keys, num_train_points):
-            (current_loss, new_stats), params_grad = self.values_and_grad_pretraining_smoother(
-                parameters, stats, data, data_stats, keys, num_train_points)
-
-            updates, opt_state = tx_smoother_pretraining.update(params_grad, opt_state, parameters)
-            parameters_train_new = optax.apply_updates(parameters, updates)
-            return current_loss, opt_state, parameters_train_new, new_stats
-
-        # Run optimization for predefine number of steps
-        def run_optimization(number_of_steps, params, stats, opt_state, data, data_stats, episode, keys):
-            self.optimize(do_step=do_step, num_steps=number_of_steps, params=params, stats=stats,
-                          opt_state=opt_state, data=data, data_stats=data_stats,
-                          log_name='Smoother pretraining/Full objective', episode=episode, keys=keys)
-
-        return prepare_parameters_and_stats, run_optimization
-
-    def prepare_pretraining_dynamics(self):
-        if self.track_wandb:
-            wandb.define_metric("x_axis/step")
-            # set all other train/ metrics to use this step
-            wandb.define_metric("Dynamics pretraining/*", step_metric="x_axis/step", summary="last")
-            wandb.define_metric('Dynamics pretraining/iter_time', step_metric="x_axis/step", summary='mean')
-        tx_dynamics_pretraining = self.optimizer_pretraining_dynamics(
-            self.learning_rate_pretraining_dynamics,
-            weight_decay=self.config.optimizers.pretraining_dynamics.wd)
+            wandb.define_metric("Dynamics training/*", step_metric="x_axis/step", summary="last")
+            wandb.define_metric('Dynamics training/iter_time', step_metric="x_axis/step", summary='mean')
+        tx_dynamics_training = self.optimizer_dynamics_training(
+            self.learning_rate_dynamics_training,
+            weight_decay=self.config.optimizers.dynamics_training.wd)
 
         def prepare_parameters_and_stats(key):
             # Reset smoother and dynamics parameters
@@ -303,16 +218,16 @@ class LearnSystem:
             params_train = {'dynamics': self.parameters['dynamics']}
             stats_train = {'dynamics': self.stats['dynamics']}
             # Watch trainable parameters with the optimizer
-            opt_state = tx_dynamics_pretraining.init(params_train)
+            opt_state = tx_dynamics_training.init(params_train)
             return params_train, stats_train, opt_state
 
         # Define optimization step
         @jit
         def do_step(step, parameters, stats, opt_state, data, data_stats, keys, num_train_points):
-            (current_loss, new_stats), params_grad = self.values_and_grad_pretraining_dynamics(
+            (current_loss, new_stats), params_grad = self.values_and_grad_dynamics_training(
                 parameters, stats, data, data_stats, keys, num_train_points)
 
-            updates, opt_state = tx_dynamics_pretraining.update(params_grad, opt_state, parameters)
+            updates, opt_state = tx_dynamics_training.update(params_grad, opt_state, parameters)
             parameters_train_new = optax.apply_updates(parameters, updates)
             return current_loss, opt_state, parameters_train_new, new_stats
 
@@ -320,42 +235,7 @@ class LearnSystem:
         def run_optimization(number_of_steps, params, stats, opt_state, data, data_stats, episode, keys):
             self.optimize(do_step=do_step, num_steps=number_of_steps, params=params, stats=stats,
                           opt_state=opt_state, data=data, data_stats=data_stats,
-                          log_name='Dynamics pretraining/Full objective', episode=episode, keys=keys)
-
-        return prepare_parameters_and_stats, run_optimization
-
-    def prepare_joint_training(self):
-        if self.track_wandb:
-            wandb.define_metric("x_axis/step")
-            # set all other train/ metrics to use this step
-            wandb.define_metric("Learning dynamics/*", step_metric="x_axis/step", summary="last")
-            wandb.define_metric('Learning dynamics/iter_time', step_metric="x_axis/step", summary='mean')
-        tx_learn_dynamics = self.optimizer_joint_training(self.learning_rate_joint_training,
-                                                          weight_decay=self.config.optimizers.joint_training.wd)
-
-        def prepare_parameters_and_stats(_):
-            # Prepare trainable parameters
-            params_train = self.parameters
-            stats_train = self.stats
-            # Watch trainable parameters with the optimizer
-            opt_state = tx_learn_dynamics.init(params_train)
-            return params_train, stats_train, opt_state
-
-        # Define optimization step
-        @jit
-        def do_step(step, parameters, stats, opt_state, data, data_stats, keys, num_train_points):
-            (loss, new_stats), params_grad = self.values_and_grad_joint_training(parameters, stats, data, data_stats,
-                                                                                 self.betas_joint_training(step), keys,
-                                                                                 num_train_points)
-            updates, opt_state = tx_learn_dynamics.update(params_grad, opt_state, parameters)
-            parameters_train_new = optax.apply_updates(parameters, updates)
-            return loss, opt_state, parameters_train_new, new_stats
-
-        # Run optimization for predefine number of steps
-        def run_optimization(number_of_steps, params, stats, opt_state, data, data_stats, episode, keys):
-            self.optimize(do_step=do_step, num_steps=number_of_steps, params=params,
-                          stats=stats, opt_state=opt_state, data=data, data_stats=data_stats,
-                          log_name='Learning dynamics/Full objective', episode=episode, keys=keys)
+                          log_name='Dynamics training/Full objective', episode=episode, keys=keys)
 
         return prepare_parameters_and_stats, run_optimization
 
@@ -365,26 +245,18 @@ class LearnSystem:
         current_time, iter_time = time.time(), 0
         initial_time = current_time
         self.current_rng, key = random.split(self.current_rng)
-        if data.dynamics_data is not None:
-            num_train_points_dynamics = data.dynamics_data.xs.shape[0]
-            num_train_points_matching = data.matching_data.ts.shape[0]
-            num_train_points_smoothing = data.smoothing_data.ys.shape[0]
-        else:
-            num_train_points_dynamics = 0
-            num_train_points_matching = data.matching_data.ts.shape[0]
-            num_train_points_smoothing = data.smoothing_data.ys.shape[0]
 
-        num_train_points = NumberTrainPoints(dynamics=num_train_points_dynamics, matching=num_train_points_matching,
-                                             smoother=num_train_points_smoothing)
-        data_loader = self.data_batcher.prepare_loader(dataset=data, key=self.current_rng,
-                                                       no_dynamics_data=data.dynamics_data is None)
+        num_train_points_dynamics = data.dynamics_data.xs.shape[0]
+        num_train_points = NumberTrainPoints(dynamics=num_train_points_dynamics, matching=0,
+                                             smoother=0)
+        data_loader = self.data_batcher.prepare_loader(dataset=data, key=self.current_rng)
 
         # for step in range(num_steps):
         for step, data_batch in enumerate(data_loader):
             # Print times of first 10 steps to see the time which we need for training
             if step >= num_steps:
                 break
-            cur_data = DataLearn(*data_batch)
+            cur_data = DataLearn(dynamics_data=data_batch)
             new_step_key_gen, step_key = jax.random.split(keys.step_key)
             this_step_keys = Keys(step_key=step_key, episode_key=keys.episode_key)
             keys = Keys(step_key=new_step_key_gen, episode_key=keys.episode_key)
@@ -455,21 +327,8 @@ class LearnSystem:
                     for traj_id in range(self.num_trajectories)})
 
     @staticmethod
-    def data_for_learning(data: DataRepr, vf_data: DynamicsData | None = None) -> DataLearn:
-        return DataLearn(
-            smoothing_data=SmoothingData(
-                ts=jnp.concatenate(data.observation_data.ts),
-                x0s=jnp.concatenate(data.observation_data.x0s),
-                ys=jnp.concatenate(data.observation_data.ys),
-                us=jnp.concatenate(data.observation_data.us),
-            ),
-            matching_data=MatchingData(
-                ts=jnp.concatenate(data.matching_data.ts),
-                x0s=jnp.concatenate(data.matching_data.x0s),
-                us=jnp.concatenate(data.matching_data.us),
-            ),
-            dynamics_data=vf_data
-        )
+    def data_for_learning(dynamics_data: DynamicsData) -> DataLearn:
+        return DataLearn(dynamics_data=dynamics_data)
 
     def log_measurement_selection(self, episode: int, measurement_selection: MeasurementSelection):
         fig_measurement_selection, fig_measurement_selection_space, fig_phase = self.plotter.plot_measurement_selection(
@@ -491,10 +350,9 @@ class LearnSystem:
 
         plt.close('all')
 
-    def run_episodes(self, num_episodes: int, num_iter_pretraining: int, num_iter_joint_training: int):
-        prepare_params_pretraining_smoother, run_optimization_pretraining_smoother = self.prepare_pretraining_smoother()
-        prepare_params_pretraining_dynamics, run_optimization_pretraining_dynamics = self.prepare_pretraining_dynamics()
-        prepare_params_joint_training, run_optimization_joint_training = self.prepare_joint_training()
+    def run_episodes(self, num_episodes: int, num_iter_training: int):
+        prepare_params_dynamics_training, run_optimization_dynamics_training = self.prepare_dynamics_training()
+
         for episode in range(num_episodes):
             print(colored('Episode {}'.format(episode), 'blue'))
             self.current_rng, self.episode_key = random.split(self.current_rng)
@@ -505,6 +363,7 @@ class LearnSystem:
                                                data_stats=self.data_stats, episode=episode,
                                                beta=self.beta_exploration(num_episodes=num_episodes),
                                                history=DynamicsData(
+                                                   ts=jnp.ones(shape=(1, 1)),
                                                    xs=jnp.ones(shape=(1, self.state_dim)),
                                                    us=jnp.ones(shape=(1, self.control_dim)),
                                                    xs_dot_std=jnp.ones(shape=(1, self.state_dim)),
@@ -512,110 +371,56 @@ class LearnSystem:
                                                calibration_alpha=jnp.ones(shape=(self.state_dim,)))
                 self.data_generator.simulator.interactor.update(dynamics_model=dynamics_model, key=key)
             data, measurement_selection = self.generate_data()
+            # Add data to permanent pool
+            xs_dot_noise = jnp.concatenate(data.observation_data.xs_dot_noise)
+            xs_dot_std = self.config.data_generation.noise * jnp.ones_like(xs_dot_noise)
+
+            current_dynamics_data = DynamicsData(ts=jnp.concatenate(data.observation_data.ts),
+                                                 xs=jnp.concatenate(data.observation_data.xs),
+                                                 us=jnp.concatenate(data.observation_data.us),
+                                                 xs_dot=xs_dot_noise, xs_dot_std=xs_dot_std)
+            # Need to add dynamics_data to the permanent and test pool
+            self.vector_field_data.add_data_to_permanent_pool(current_dynamics_data)
+
+            current_data = self.data_for_learning(self.vector_field_data.permanent_pool)
+            data_stats = self.normalizer.compute_stats(current_data)
+            self.data_stats = data_stats
             if episode >= 1:
                 self.log_measurement_selection(episode, measurement_selection)
             self.cost_logging(episode, data.visualization_data, predicted_data=self.offline_planning_data)
             # Pretraining
-            print(colored('Pretraining', 'green'))
-
-            self.current_rng, *key_pretraining = jax.random.split(self.current_rng, 3)
+            print(colored('Training', 'green'))
             self.current_rng, step_key = jax.random.split(self.current_rng)
             keys = Keys(episode_key=self.episode_key, step_key=step_key)
-            # Pretrain smoother
-            params_train, stats_train, opt_state = prepare_params_pretraining_smoother(key_pretraining[0])
-            current_data = self.data_for_learning(data)
-            data_stats = self.normalizer.compute_stats(current_data)
-            self.data_stats = data_stats
+            # Train dynamics
+            self.current_rng, train_key = jax.random.split(self.current_rng)
+            params_train, stats_train, opt_state = prepare_params_dynamics_training(train_key)
 
-            self.current_rng, key = random.split(self.current_rng)
-
-            run_optimization_pretraining_smoother(number_of_steps=num_iter_pretraining, params=params_train,
-                                                  stats=stats_train, opt_state=opt_state, data=current_data,
-                                                  data_stats=data_stats, episode=episode, keys=keys)
-
-            self.current_rng, subkey_for_vf_data = random.split(self.current_rng)
-            sampled_data = self.smoother.sample_vector_field_data(self.parameters['smoother'], self.stats['smoother'],
-                                                                  current_data.smoothing_data.ts,
-                                                                  current_data.smoothing_data.ys,
-                                                                  current_data.smoothing_data.x0s, self.data_stats,
-                                                                  subkey_for_vf_data)
-
-            self.vector_field_data.add_data_to_training_pool(x=sampled_data.xs, u=current_data.smoothing_data.us,
-                                                             x_dot=sampled_data.xs_dot,
-                                                             std_x_dot=sampled_data.std_xs_dot)
-            vector_field_data = DynamicsData(**deepcopy(self.vector_field_data.training_pool))
-
-            # Pretrain dynamics
-            params_train, stats_train, opt_state = prepare_params_pretraining_dynamics(key_pretraining[0])
-            current_data = self.data_for_learning(data, vector_field_data)
-            data_stats = self.normalizer.compute_stats(current_data)
-            self.data_stats = data_stats
-
-            self.current_rng, key = random.split(self.current_rng)
-            run_optimization_pretraining_dynamics(number_of_steps=num_iter_pretraining, params=params_train,
-                                                  stats=stats_train, opt_state=opt_state, data=current_data,
-                                                  data_stats=data_stats, episode=episode, keys=keys)
+            run_optimization_dynamics_training(number_of_steps=num_iter_training, params=params_train,
+                                               stats=stats_train, opt_state=opt_state, data=current_data,
+                                               data_stats=data_stats, episode=episode, keys=keys)
 
             self.dynamics_model = DynamicsModel(params=self.parameters['dynamics'], model_stats=self.stats['dynamics'],
                                                 data_stats=self.data_stats, episode=episode + 1,
                                                 calibration_alpha=jnp.ones(shape=(self.state_dim,)),
-                                                history=vector_field_data)
-
-            if self.visualization and self.track_wandb:
-                self.visualize_data(data=data, data_stats=self.data_stats, episode=episode, stage='pretraining')
-
-            # Learn dynamics
-            print(colored('Learning system', 'green'))
-            self.current_rng, key_params_joint_training = jax.random.split(self.current_rng)
-            params_train, stats_train, opt_state = prepare_params_joint_training(key_params_joint_training)
-
-            self.current_rng, step_key = jax.random.split(self.current_rng)
-            keys = Keys(episode_key=self.episode_key, step_key=step_key)
-            run_optimization_joint_training(number_of_steps=num_iter_joint_training, params=params_train,
-                                            stats=stats_train, opt_state=opt_state, data=current_data,
-                                            data_stats=data_stats, episode=episode, keys=keys)
-
-            sampled_data = self.smoother.sample_vector_field_data(self.parameters['smoother'], self.stats['smoother'],
-                                                                  current_data.smoothing_data.ts,
-                                                                  current_data.smoothing_data.ys,
-                                                                  current_data.smoothing_data.x0s, self.data_stats,
-                                                                  subkey_for_vf_data)
-
-            self.current_rng, subkey_test_data = random.split(self.current_rng)
-
-            sampled_data_test = self.smoother.sample_vector_field_data(self.parameters['smoother'],
-                                                                       self.stats['smoother'],
-                                                                       current_data.smoothing_data.ts,
-                                                                       current_data.smoothing_data.ys,
-                                                                       current_data.smoothing_data.x0s, self.data_stats,
-                                                                       subkey_test_data)
-
-            self.vector_field_data.add_data_to_test_pool(x=sampled_data_test.xs, u=current_data.smoothing_data.us,
-                                                         x_dot=sampled_data_test.xs_dot,
-                                                         std_x_dot=sampled_data_test.std_xs_dot)
-
-            self.vector_field_data.add_data_to_permanent_pool(x=sampled_data.xs, u=current_data.smoothing_data.us,
-                                                              x_dot=sampled_data.xs_dot,
-                                                              std_x_dot=sampled_data.std_xs_dot)
+                                                history=self.vector_field_data.permanent_pool)
 
             # Compute calibration
-            dynamics_model = DynamicsModel(params=self.parameters['dynamics'], model_stats=self.stats['dynamics'],
-                                           data_stats=self.data_stats, episode=episode + 1)
-
             calibration_dynamics_alpha = self.dynamics.calculate_calibration_alpha(
-                dynamics_model=dynamics_model, xs=self.vector_field_data.test_pool['xs'],
-                us=self.vector_field_data.test_pool['us'], xs_dot=self.vector_field_data.test_pool['xs_dot'],
-                xs_dot_std=self.vector_field_data.test_pool['xs_dot_std'])
+                dynamics_model=self.dynamics_model, xs=self.vector_field_data.test_pool.xs,
+                us=self.vector_field_data.test_pool.us, xs_dot=self.vector_field_data.test_pool.xs_dot,
+                xs_dot_std=self.vector_field_data.test_pool.xs_dot_std)
 
             # Here we need to add uncertainties for the beta exploration
-            stds = vmap(self.dynamics.mean_and_std_eval_one, in_axes=(None, 0, 0))(self.dynamics_model, sampled_data.xs,
-                                                                                   current_data.smoothing_data.us)[1]
+            stds = vmap(self.dynamics.mean_and_std_eval_one, in_axes=(None, 0, 0))(self.dynamics_model,
+                                                                                   current_dynamics_data.xs,
+                                                                                   current_dynamics_data.us)[1]
 
-            self.beta_exploration.update_info_gain(stds=stds, taus=sampled_data.std_xs_dot)
+            self.beta_exploration.update_info_gain(stds=stds, taus=xs_dot_std)
 
-            self.vector_field_data.set_training_pool_to_permanent_pool()
             if self.visualization and self.track_wandb:
-                self.visualize_data(data=data, data_stats=self.data_stats, episode=episode)
+                self.visualize_data(data=data, episode=episode)
+
             # Trajectory optimization
             print(colored('Trajectory optimization', 'blue'))
             start_time_trajectory_optimization = time.time()
@@ -624,14 +429,13 @@ class LearnSystem:
             dynamics_model = DynamicsModel(params=self.parameters['dynamics'], model_stats=self.stats['dynamics'],
                                            data_stats=self.data_stats, episode=episode + 1,
                                            beta=self.beta_exploration(num_episodes=num_episodes),
-                                           history=DynamicsData(**deepcopy(self.vector_field_data.permanent_pool)),
+                                           history=deepcopy(self.vector_field_data.permanent_pool),
                                            calibration_alpha=calibration_dynamics_alpha)
 
             self.dynamics_model = dynamics_model
             self.data_generator.simulator.interactor.update(dynamics_model=dynamics_model, key=key)
             print('Time spent for trajectory optimization: {} seconds'.format(
                 time.time() - start_time_trajectory_optimization))
-
             self.offline_planning_data = self.data_generator.simulator.interactor.offline_planning_data
             if self.visualization and self.track_wandb:
                 self.visualize_controller(offline_planning_data=self.offline_planning_data, episode=episode)
@@ -677,16 +481,7 @@ class LearnSystem:
         wandb.log({episode_prefix + 'TO: Control learning': wandb.Image(fig_control_learning), })
         plt.close('all')
 
-    def visualize_data(self, data: DataRepr, data_stats: DataStats, episode: int,
-                       stage: str = ''):
-        smoother_posterior = vmap(self.smoother.posterior, in_axes=(None, None, 0, 0, None, None, None, None))(
-            self.parameters["smoother"], self.stats['smoother'], data.visualization_data.ts,
-            data.visualization_data.x0s, jnp.concatenate(data.observation_data.ts),
-            jnp.concatenate(data.observation_data.x0s), jnp.concatenate(data.observation_data.ys), data_stats)
-
-        state_std_vis = jnp.sqrt(smoother_posterior.xs_var)
-        der_std_vis = jnp.sqrt(smoother_posterior.xs_dot_var)
-
+    def visualize_data(self, data: DataRepr, episode: int, stage: str = ''):
         # Compute dynamics terms
         dynamics_der_means_vis, dynamics_der_stds_vis = vmap(self.dynamics.mean_and_std_eval_batch,
                                                              in_axes=(None, 0, 0))(self.dynamics_model,
@@ -705,18 +500,14 @@ class LearnSystem:
                                                                                   data.visualization_data)
 
         plot_data = PlotData(
-            smoother_state_means=smoother_posterior.xs_mean,
-            smoother_state_vars=state_std_vis ** 2,
-            smoother_der_means=smoother_posterior.xs_dot_mean,
-            smoother_der_vars=der_std_vis ** 2,
             dynamics_der_means=dynamics_der_means_vis,
             dynamics_der_vars=dynamics_der_stds_vis ** 2,
             actual_actions=data.visualization_data.us,
             visualization_times=data.visualization_data.ts,
             observation_times=data.observation_data.ts,
-            observations=data.observation_data.ys,
+            observations=data.observation_data.xs_dot_noise,
             gt_states_vis=data.visualization_data.xs,
-            gt_der_vis=data.visualization_data.xs_dot,
+            gt_der_vis=data.visualization_data.xs_dot_true,
             prediction_states=pred_states,
             predicted_actions=pred_control,
         )
@@ -736,17 +527,14 @@ class LearnSystem:
         wandb.save(os.path.join(wandb.run.dir, data_path), wandb.run.dir)
         wandb.save(os.path.join(wandb.run.dir, data_vis_path), wandb.run.dir)
 
-        fig_smoother_states, fig_smoother_der, fig_dynamics_der = self.plotter.plot(plot_data)
-        fig_smoother_states.tight_layout()
-        fig_smoother_der.tight_layout()
+        fig_dynamics_der, fig_state = self.plotter.plot(plot_data)
         fig_dynamics_der.tight_layout()
+        fig_state.tight_layout()
 
         episode_prefix = 'Episode ' + str(episode) + stage + '/'
         if stage == 'pretraining':
             episode_prefix = 'Episode ' + str(episode) + ' ' + stage + '/'
 
-        wandb.log({episode_prefix + 'DGM: Smoother states': wandb.Image(fig_smoother_states),
-                   episode_prefix + 'DGM: Smoother derivatives': wandb.Image(fig_smoother_der),
-                   episode_prefix + 'DGM: Dynamics derivatives': wandb.Image(fig_dynamics_der)})
-
+        wandb.log({episode_prefix + 'DGM: Dynamics derivatives': wandb.Image(fig_dynamics_der),
+                   episode_prefix + 'DGM: State': wandb.Image(fig_state)})
         plt.close('all')

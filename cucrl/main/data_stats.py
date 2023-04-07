@@ -1,5 +1,5 @@
 from functools import partial
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 import jax
 import tensorflow as tf
@@ -17,39 +17,23 @@ class Stats(NamedTuple):
 
 
 class DataStats(NamedTuple):
-    ic_stats: Stats
     ts_stats: Stats
-    ys_stats: Stats
-    xs_stats: Optional[Stats] = None
-    us_stats: Optional[Stats] = None
-    dot_xs_stats: Optional[Stats] = None
-    xs_after_angle_layer: Optional[Stats] = None
+    xs_stats: Stats
+    us_stats: Stats
+    xs_dot_noise_stats: Stats
+    xs_after_angle_layer: Stats
 
 
 class DynamicsData(NamedTuple):
-    xs: jnp.ndarray
-    us: jnp.ndarray
-    xs_dot: jnp.ndarray
-    xs_dot_std: jnp.ndarray
-
-
-class SmoothingData(NamedTuple):
-    ts: jnp.ndarray
-    x0s: jnp.ndarray
-    ys: jnp.ndarray
-    us: jnp.ndarray
-
-
-class MatchingData(NamedTuple):
-    ts: jnp.ndarray
-    x0s: jnp.ndarray
-    us: jnp.ndarray
+    ts: jax.Array
+    xs: jax.Array
+    us: jax.Array
+    xs_dot: jax.Array
+    xs_dot_std: jax.Array
 
 
 class DataLearn(NamedTuple):
-    smoothing_data: SmoothingData
-    matching_data: MatchingData | None = None
-    dynamics_data: DynamicsData | None = None
+    dynamics_data: DynamicsData
 
 
 class Normalizer:
@@ -65,18 +49,13 @@ class Normalizer:
         self.y_dim = self.tracking_c.shape[0]
 
     def compute_stats(self, data: DataLearn):
-        if data.dynamics_data is not None:
-            state_after_angle_layer = vmap(self.angle_layer.angle_layer)(data.dynamics_data.xs)
-            return DataStats(ic_stats=self.normalize_stats(data.smoothing_data.x0s),
-                             ts_stats=self.normalize_stats(data.smoothing_data.ts),
-                             ys_stats=self.normalize_stats(data.smoothing_data.ys),
-                             xs_stats=self.normalize_stats(data.dynamics_data.xs),
-                             us_stats=self.normalize_stats(data.dynamics_data.us),
-                             dot_xs_stats=self.normalize_stats(data.dynamics_data.xs_dot),
-                             xs_after_angle_layer=self.normalize_stats(state_after_angle_layer))
-        else:
-            return DataStats(self.normalize_stats(data.smoothing_data.x0s),
-                             self.normalize_stats(data.smoothing_data.ts), self.normalize_stats(data.smoothing_data.ys))
+        state_after_angle_layer = vmap(self.angle_layer.angle_layer)(data.dynamics_data.xs)
+        return DataStats(
+            ts_stats=self.normalize_stats(data.dynamics_data.ts),
+            xs_stats=self.normalize_stats(data.dynamics_data.xs),
+            us_stats=self.normalize_stats(data.dynamics_data.us),
+            xs_dot_noise_stats=self.normalize_stats(data.dynamics_data.xs_dot),
+            xs_after_angle_layer=self.normalize_stats(state_after_angle_layer))
 
     @partial(jax.jit, static_argnums=0)
     def normalize_c_scale(self, to_normalize: jnp.ndarray, stats: Stats):
@@ -119,27 +98,6 @@ class Normalizer:
         assert to_denormalize.ndim == 1
         return to_denormalize * stats.std
 
-    @partial(jax.jit, static_argnums=0)
-    def denormalize_smoother_der(self, smoother_der, ys_stats: Stats, ts_stats: Stats):
-        assert smoother_der.shape == (self.state_dim,)
-        sigma_ys = ys_stats.std
-        assert sigma_ys.shape == (self.state_dim,)
-        return (sigma_ys / ts_stats.std) * smoother_der
-
-    @partial(jax.jit, static_argnums=0)
-    def denormalize_smoother_der_var(self, smoother_der, ys_stats: Stats):
-        assert smoother_der.shape == (self.state_dim,)
-        sigma_ys = ys_stats.std
-        assert sigma_ys.shape == (self.state_dim,)
-        return sigma_ys ** 2 * smoother_der
-
-    @partial(jax.jit, static_argnums=0)
-    def denormalize_smoother_der_std(self, smoother_der, ys_stats: Stats, ts_stats: Stats):
-        assert smoother_der.shape == (self.state_dim,)
-        sigma_ys = ys_stats.std
-        assert sigma_ys.shape == (self.state_dim,)
-        return (sigma_ys / ts_stats.std) * smoother_der
-
 
 class DataLoader:
     def __init__(self, batch_size: BatchSize, no_batching: bool = False):
@@ -163,23 +121,15 @@ class DataLoader:
         while True:
             yield None
 
-    def prepare_loader(self, dataset: DataLearn, key: random.PRNGKey, no_dynamics_data: bool = False):
+    def prepare_loader(self, dataset: DataLearn, key: random.PRNGKey):
         if self.no_batching:
             def _return_all():
                 while True:
-                    yield dataset.smoothing_data, dataset.matching_data, dataset.dynamics_data
+                    yield dataset.dynamics_data
 
             return _return_all()
-        if no_dynamics_data:
-            ds_smoothing = self._create_data_loader(dataset.smoothing_data, self.batch_size.smoothing, key)
-            ds_matching = self._create_data_loader(dataset.matching_data, self.batch_size.matching, key)
-            ds_dynamics = self._non_gen()
-            return zip(ds_smoothing, ds_matching, ds_dynamics)
-        else:
-            ds_smoothing = self._create_data_loader(dataset.smoothing_data, self.batch_size.smoothing, key)
-            ds_matching = self._create_data_loader(dataset.matching_data, self.batch_size.matching, key)
-            ds_dynamics = self._create_data_loader(dataset.dynamics_data, self.batch_size.dynamics, key)
-            return zip(ds_smoothing, ds_matching, ds_dynamics)
+        ds_dynamics = self._create_data_loader(dataset.dynamics_data, self.batch_size.dynamics, key)
+        return ds_dynamics
 
 
 if __name__ == '__main__':
@@ -188,17 +138,4 @@ if __name__ == '__main__':
     xs_dim = 3
     us_dim = 2
 
-    data = DataLearn(
-        smoothing_data=SmoothingData(
-            x0s=jnp.ones(shape=(num_smooth, xs_dim)),
-            us=jnp.ones(shape=(num_smooth, us_dim)),
-            ts=jnp.ones(shape=(num_smooth, 1)),
-            ys=jnp.ones(shape=(num_smooth, xs_dim))),
-        dynamics_data=None,
-        matching_data=MatchingData(
-            ts=jnp.ones(shape=(num_smooth, 1)),
-            us=jnp.ones(shape=(num_smooth, us_dim)),
-            x0s=jnp.ones(shape=(num_smooth, xs_dim)), )
-    )
-
-    batch_size = BatchSize(smoothing=13, dynamics=5, matching=3)
+    batch_size = BatchSize(dynamics=5)

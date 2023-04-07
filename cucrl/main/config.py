@@ -17,8 +17,6 @@ class Scaling(NamedTuple):
 
 
 class BatchSize(NamedTuple):
-    smoothing: int
-    matching: int
     dynamics: int
 
 
@@ -132,9 +130,7 @@ class OptimizerConfig(NamedTuple):
 
 class OptimizersConfig(NamedTuple):
     batch_size: BatchSize
-    pretraining_dynamics: OptimizerConfig
-    pretraining_smoother: OptimizerConfig
-    joint_training: OptimizerConfig
+    dynamics_training: OptimizerConfig
     no_batching: bool = True
 
 

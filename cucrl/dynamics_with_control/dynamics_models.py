@@ -130,7 +130,7 @@ class BNNDynamics(AbstractDynamics):
         zs = jnp.concatenate([expanded_xs, us], axis=1)
         input_stats = jtu.tree_map(lambda *w: jnp.concatenate(w), dynamics_model.data_stats.xs_after_angle_layer,
                                    dynamics_model.data_stats.us_stats)
-        f_data_stats = DataStatsFSVGD(input_stats=input_stats, output_stats=dynamics_model.data_stats.dot_xs_stats)
+        f_data_stats = DataStatsFSVGD(input_stats=input_stats, output_stats=dynamics_model.data_stats.xs_dot_noise_stats)
         # Todo: pass ps as argument
         num_ps = 10
         ps = jnp.linspace(0, 1, num_ps + 1)[1:]
@@ -143,7 +143,7 @@ class BNNDynamics(AbstractDynamics):
         z = jnp.concatenate([expanded_x, u])
         input_stats = jtu.tree_map(lambda *w: jnp.concatenate(w), dynamics_model.data_stats.xs_after_angle_layer,
                                    dynamics_model.data_stats.us_stats)
-        f_data_stats = DataStatsFSVGD(input_stats=input_stats, output_stats=dynamics_model.data_stats.dot_xs_stats)
+        f_data_stats = DataStatsFSVGD(input_stats=input_stats, output_stats=dynamics_model.data_stats.xs_dot_noise_stats)
         xs_dot = vmap(self.BNN.apply_eval, in_axes=(0, 0, None, None))(dynamics_model.params,
                                                                        dynamics_model.model_stats, z, f_data_stats)
         return xs_dot
@@ -212,7 +212,7 @@ class BNNDynamics(AbstractDynamics):
         z = jnp.concatenate([expanded_state, control], axis=1)
         data = DataRepr(xs=z, ys=state_der)
         input_stats = jtu.tree_map(lambda *x: jnp.concatenate(x), data_stats.xs_after_angle_layer, data_stats.us_stats)
-        f_data_stats = DataStatsFSVGD(input_stats=input_stats, output_stats=data_stats.dot_xs_stats)
+        f_data_stats = DataStatsFSVGD(input_stats=input_stats, output_stats=data_stats.xs_dot_noise_stats)
         return self.BNN.loss(params, stats, data, f_data_stats, std_state_der, num_train_points, key)
 
     def initialize_parameters(self, key: jax.random.PRNGKey) -> Tuple[FrozenDict, FrozenDict]:
@@ -251,9 +251,9 @@ class GPDynamics(AbstractDynamics):
                                                                 dynamics_model.data_stats.us_stats)
 
         dot_xs = vmap(self.normalizer.normalize, in_axes=(0, None))(dynamics_model.history.xs_dot,
-                                                                    dynamics_model.data_stats.dot_xs_stats)
+                                                                    dynamics_model.data_stats.xs_dot_noise_stats)
         std_dot_xs = vmap(self.normalizer.normalize_std, in_axes=(0, None))(dynamics_model.history.xs_dot_std,
-                                                                            dynamics_model.data_stats.dot_xs_stats)
+                                                                            dynamics_model.data_stats.xs_dot_noise_stats)
 
         cat_input = jnp.concatenate([expanded_x, u])
         inputs = jnp.concatenate([expanded_xs, us], axis=1)
@@ -276,8 +276,8 @@ class GPDynamics(AbstractDynamics):
         mean = vmap(jnp.dot)(k_x_X, denoised_mean)
 
         # Denormalize
-        mean = self.normalizer.denormalize(mean, dynamics_model.data_stats.dot_xs_stats)
-        std = self.normalizer.denormalize_std(std, dynamics_model.data_stats.dot_xs_stats)
+        mean = self.normalizer.denormalize(mean, dynamics_model.data_stats.xs_dot_noise_stats)
+        std = self.normalizer.denormalize_std(std, dynamics_model.data_stats.xs_dot_noise_stats)
 
         return mean, std
 
@@ -289,8 +289,8 @@ class GPDynamics(AbstractDynamics):
         expanded_xs = vmap(self.normalizer.normalize, in_axes=(0, None))(expanded_xs, data_stats.xs_after_angle_layer)
         us = vmap(self.normalizer.normalize, in_axes=(0, None))(us, data_stats.us_stats)
 
-        dot_xs = vmap(self.normalizer.normalize, in_axes=(0, None))(dot_xs, data_stats.dot_xs_stats)
-        std_dot_xs = vmap(self.normalizer.normalize_std, in_axes=(0, None))(std_dot_xs, data_stats.dot_xs_stats)
+        dot_xs = vmap(self.normalizer.normalize, in_axes=(0, None))(dot_xs, data_stats.xs_dot_noise_stats)
+        std_dot_xs = vmap(self.normalizer.normalize_std, in_axes=(0, None))(std_dot_xs, data_stats.xs_dot_noise_stats)
 
         inputs = jnp.concatenate([expanded_xs, us], axis=1)
 
@@ -326,9 +326,9 @@ class GPDynamics(AbstractDynamics):
                                                                 dynamics_model.data_stats.us_stats)
 
         dot_xs = vmap(self.normalizer.normalize, in_axes=(0, None))(dynamics_model.history.xs_dot,
-                                                                    dynamics_model.data_stats.dot_xs_stats)
+                                                                    dynamics_model.data_stats.xs_dot_noise_stats)
         std_dot_xs = vmap(self.normalizer.normalize_std, in_axes=(0, None))(dynamics_model.history.xs_dot_std,
-                                                                            dynamics_model.data_stats.dot_xs_stats)
+                                                                            dynamics_model.data_stats.xs_dot_noise_stats)
 
         cat_input = jnp.concatenate([expanded_x, u])
         inputs = jnp.concatenate([expanded_xs, us], axis=1)
@@ -345,7 +345,7 @@ class GPDynamics(AbstractDynamics):
         mean = vmap(jnp.dot)(k_x_X, denoised_mean)
 
         # Denormalize
-        mean = self.normalizer.denormalize(mean, dynamics_model.data_stats.dot_xs_stats)
+        mean = self.normalizer.denormalize(mean, dynamics_model.data_stats.xs_dot_noise_stats)
         return mean
 
     @partial(jit, static_argnums=0)
@@ -363,7 +363,7 @@ class GPDynamics(AbstractDynamics):
                                                                 dynamics_model.data_stats.us_stats)
 
         std_dot_xs = vmap(self.normalizer.normalize_std, in_axes=(0, None))(dynamics_model.history.xs_dot_std,
-                                                                            dynamics_model.data_stats.dot_xs_stats)
+                                                                            dynamics_model.data_stats.xs_dot_noise_stats)
 
         history_inputs = jnp.concatenate([expanded_xs, us], axis=1)
         covariance_matrix_history = self.m_kernel_multiple_output(history_inputs, history_inputs, dynamics_model.params)
@@ -447,7 +447,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
         pass
 
     def _norm_control_affine_part(self, x, u, data_stats):
-        return self.normalizer.normalize(self._control_affine_part(x, u), data_stats.dot_xs_stats)
+        return self.normalizer.normalize(self._control_affine_part(x, u), data_stats.xs_dot_noise_stats)
 
     def _state_dynamics_train_one(self, params, stats, x, data_stats):
         assert x.shape == (self.state_dim,)
@@ -472,7 +472,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
         stats_particle = tree_map(lambda z: z[dynamics_idx, ...], params)
         x_dot = self._dynamics_eval_one(params_particle, stats_particle, x, u, data_stats)
         denormalize = self.normalizer.denormalize
-        return denormalize(x_dot, data_stats.dot_xs_stats)
+        return denormalize(x_dot, data_stats.xs_dot_noise_stats)
 
     def _dynamics_train_one(self, params, stats, x, u, data_stats):
         assert x.shape == (self.state_dim,) and u.shape == (self.action_dim,)
@@ -500,7 +500,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
                                                                                             data_stats)
         denormalize = self.normalizer.denormalize
         mean = jnp.mean(means, axis=0) + self._norm_control_affine_part(x, u, data_stats)
-        return denormalize(mean, data_stats.dot_xs_stats)
+        return denormalize(mean, data_stats.xs_dot_noise_stats)
 
     def std_eval_one(self, params, stats, x, data_stats):
         means = vmap(self._state_dynamics_eval_one, in_axes=(0, 0, None, None), out_axes=0)(params, stats, x,
@@ -516,7 +516,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
         denormalize = self.normalizer.denormalize
         denormalize_std = self.normalizer.denormalize_std
 
-        return denormalize(mean, data_stats.dot_xs_stats), denormalize_std(std, data_stats.dot_xs_stats)
+        return denormalize(mean, data_stats.xs_dot_noise_stats), denormalize_std(std, data_stats.xs_dot_noise_stats)
 
     def _initialize_parameters(self, key):
         variables = self.model.init(key, jnp.ones(shape=(self.state_dim,)))
@@ -544,7 +544,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
             x_dot = self._dynamics_eval_one(tree_map(lambda x: x[sample, ...], params),
                                             tree_map(lambda x: x[sample, ...], stats), x, u, data_stats)
             denormalize = self.normalizer.denormalize
-            return denormalize(x_dot, data_stats.dot_xs_stats)
+            return denormalize(x_dot, data_stats.xs_dot_noise_stats)
 
         return _one_dynamics
 
@@ -554,7 +554,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
             x_dot = self._dynamics_eval_one(tree_map(lambda x: x[idx, ...], params),
                                             tree_map(lambda x: x[idx, ...], stats), x, u, data_stats)
             denormalize = self.normalizer.denormalize
-            return denormalize(x_dot, data_stats.dot_xs_stats)
+            return denormalize(x_dot, data_stats.xs_dot_noise_stats)
 
         return _one_dynamics
 
@@ -597,10 +597,10 @@ class AbstractfSVGDDynamics(AbstractDynamics):
         us_norm = normalize(us, data_stats.us_stats)
         x_batch = jnp.concatenate([xs_norm, us_norm], axis=1)
 
-        norm_stds = vmap(self.normalizer.normalize_std, in_axes=(0, None))(std_dot_xs, data_stats.dot_xs_stats)
+        norm_stds = vmap(self.normalizer.normalize_std, in_axes=(0, None))(std_dot_xs, data_stats.xs_dot_noise_stats)
         norm_stds_repeated = jnp.repeat(norm_stds[jnp.newaxis, ...], repeats=self.num_particles, axis=0)
 
-        norm_xs_dot = vmap(self.normalizer.normalize, in_axes=(0, None))(dot_xs, data_stats.dot_xs_stats)
+        norm_xs_dot = vmap(self.normalizer.normalize, in_axes=(0, None))(dot_xs, data_stats.xs_dot_noise_stats)
         norm_xs_dot_repeated = jnp.repeat(norm_xs_dot[jnp.newaxis, ...], repeats=self.num_particles, axis=0)
 
         assert x_dot_pred.shape == (self.num_particles, xs.shape[0], self.state_dim)
@@ -711,7 +711,7 @@ class fSVGDAffineDynamics(AbstractDynamics):
         stats_particle = tree_map(lambda z: z[dynamics_idx, ...], params)
         x_dot = self._dynamics_eval_one(params_particle, stats_particle, x, u, data_stats)
         denormalize = self.normalizer.denormalize
-        return denormalize(x_dot, data_stats.dot_xs_stats)
+        return denormalize(x_dot, data_stats.xs_dot_noise_stats)
 
     def mean_train_one(self, params, stats, x, u, data_stats):
         means, new_stats = vmap(self._dynamics_train_one, in_axes=(0, 0, None, None, None), out_axes=0)(params, stats,
@@ -736,7 +736,7 @@ class fSVGDAffineDynamics(AbstractDynamics):
                                                                                             data_stats)
         denormalize = self.normalizer.denormalize
         mean = jnp.mean(means, axis=0)
-        return denormalize(mean, data_stats.dot_xs_stats)
+        return denormalize(mean, data_stats.xs_dot_noise_stats)
 
     def std_eval_one(self, params, stats, x, u, data_stats):
         means = vmap(self._dynamics_eval_one, in_axes=(0, 0, None, None, None), out_axes=0)(params, stats, x, u,
@@ -752,7 +752,7 @@ class fSVGDAffineDynamics(AbstractDynamics):
         denormalize = self.normalizer.denormalize
         denormalize_std = self.normalizer.denormalize_std
 
-        return denormalize(mean, data_stats.dot_xs_stats), denormalize_std(std, data_stats.dot_xs_stats)
+        return denormalize(mean, data_stats.xs_dot_noise_stats), denormalize_std(std, data_stats.xs_dot_noise_stats)
 
     def _initialize_parameters(self, key):
         init_input = self.angle_layer.angle_layer(jnp.ones(shape=(self.state_dim,)))
@@ -781,7 +781,7 @@ class fSVGDAffineDynamics(AbstractDynamics):
             x_dot = self._dynamics_eval_one(tree_map(lambda x: x[sample, ...], params),
                                             tree_map(lambda x: x[sample, ...], stats), x, u, data_stats)
             denormalize = self.normalizer.denormalize
-            return denormalize(x_dot, data_stats.dot_xs_stats)
+            return denormalize(x_dot, data_stats.xs_dot_noise_stats)
 
         return _one_dynamics
 
@@ -791,7 +791,7 @@ class fSVGDAffineDynamics(AbstractDynamics):
             x_dot = self._dynamics_eval_one(tree_map(lambda x: x[idx, ...], params),
                                             tree_map(lambda x: x[idx, ...], stats), x, u, data_stats)
             denormalize = self.normalizer.denormalize
-            return denormalize(x_dot, data_stats.dot_xs_stats)
+            return denormalize(x_dot, data_stats.xs_dot_noise_stats)
 
         return _one_dynamics
 
@@ -838,10 +838,10 @@ class fSVGDAffineDynamics(AbstractDynamics):
 
         x_batch = jnp.concatenate([expanded_xs_norm, us_norm], axis=1)
 
-        norm_stds = vmap(self.normalizer.normalize_std, in_axes=(0, None))(std_dot_xs, data_stats.dot_xs_stats)
+        norm_stds = vmap(self.normalizer.normalize_std, in_axes=(0, None))(std_dot_xs, data_stats.xs_dot_noise_stats)
         norm_stds_repeated = jnp.repeat(norm_stds[jnp.newaxis, ...], repeats=self.num_particles, axis=0)
 
-        norm_xs_dot = vmap(self.normalizer.normalize, in_axes=(0, None))(dot_xs, data_stats.dot_xs_stats)
+        norm_xs_dot = vmap(self.normalizer.normalize, in_axes=(0, None))(dot_xs, data_stats.xs_dot_noise_stats)
         norm_xs_dot_repeated = jnp.repeat(norm_xs_dot[jnp.newaxis, ...], repeats=self.num_particles, axis=0)
 
         assert x_dot_pred.shape == (self.num_particles, xs.shape[0], self.state_dim)

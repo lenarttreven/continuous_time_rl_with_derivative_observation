@@ -72,10 +72,6 @@ class PlotOpenLoop(NamedTuple):
 
 
 class PlotData(NamedTuple):
-    smoother_state_means: jax.Array
-    smoother_state_vars: jax.Array
-    smoother_der_means: jax.Array
-    smoother_der_vars: jax.Array
     dynamics_der_means: jax.Array
     dynamics_der_vars: jax.Array
     actual_actions: jax.Array
@@ -96,10 +92,10 @@ class SampledData(NamedTuple):
 
 class Trajectory(NamedTuple):
     ts: jax.Array
-    ys: jax.Array
     us: jax.Array
     xs: jax.Array
-    d_xs: jax.Array
+    xs_dot_true: jax.Array
+    xs_dot_noise: jax.Array
 
 
 class MPCCarry(NamedTuple):

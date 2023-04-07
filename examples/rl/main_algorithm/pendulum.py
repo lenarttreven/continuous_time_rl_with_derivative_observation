@@ -129,20 +129,13 @@ if __name__ == '__main__':
         betas=BetasConfig(type=BetasType.CONSTANT, kwargs={'value': beta, 'num_dim': state_dim}),
         optimizers=OptimizersConfig(
             no_batching=True,
-            batch_size=BatchSize(dynamics=64, smoothing=64, matching=64, ),
-            pretraining_dynamics=OptimizerConfig(type=Optimizer.ADAM, wd=0.0,
-                                                 learning_rate=LearningRate(type=LearningRateType.PIECEWISE_CONSTANT,
-                                                                            kwargs={'boundaries': [1000],
-                                                                                    'values': [0.01, 0.001]}, )
-                                                 ),
-            pretraining_smoother=OptimizerConfig(type=Optimizer.ADAM, wd=0.0,
-                                                 learning_rate=LearningRate(type=LearningRateType.PIECEWISE_CONSTANT,
-                                                                            kwargs={'boundaries': [1000],
-                                                                                    'values': [0.01, 0.001]}, )),
-            joint_training=OptimizerConfig(type=Optimizer.ADAM, wd=0.0,
-                                           learning_rate=LearningRate(type=LearningRateType.PIECEWISE_CONSTANT,
-                                                                      kwargs={'boundaries': [1000],
-                                                                              'values': [0.01, 0.001]}, ))),
+            batch_size=BatchSize(dynamics=64),
+            dynamics_training=OptimizerConfig(type=Optimizer.ADAM, wd=0.0,
+                                              learning_rate=LearningRate(type=LearningRateType.PIECEWISE_CONSTANT,
+                                                                         kwargs={'boundaries': [2000],
+                                                                                 'values': [0.01, 0.001]}, )
+                                              ),
+        ),
         logging=LoggingConfig(track_wandb=track_wandb, track_just_loss=track_just_loss, visualization=visualization),
         comparator=ComparatorConfig(num_discrete_points=10)
     )
@@ -167,5 +160,5 @@ if __name__ == '__main__':
         config = wandb.config
 
     model = LearnSystem(run_config)
-    model.run_episodes(num_episodes=20, num_iter_pretraining=1000, num_iter_joint_training=0)
+    model.run_episodes(num_episodes=20, num_iter_training=5000)
     wandb.finish()
