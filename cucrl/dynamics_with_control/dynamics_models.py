@@ -1,3 +1,4 @@
+import math
 from abc import ABC, abstractmethod
 from functools import partial
 from typing import Any, Tuple, Sequence, List
@@ -130,7 +131,8 @@ class BNNDynamics(AbstractDynamics):
         zs = jnp.concatenate([expanded_xs, us], axis=1)
         input_stats = jtu.tree_map(lambda *w: jnp.concatenate(w), dynamics_model.data_stats.xs_after_angle_layer,
                                    dynamics_model.data_stats.us_stats)
-        f_data_stats = DataStatsFSVGD(input_stats=input_stats, output_stats=dynamics_model.data_stats.xs_dot_noise_stats)
+        f_data_stats = DataStatsFSVGD(input_stats=input_stats,
+                                      output_stats=dynamics_model.data_stats.xs_dot_noise_stats)
         # Todo: pass ps as argument
         num_ps = 10
         ps = jnp.linspace(0, 1, num_ps + 1)[1:]
@@ -143,7 +145,8 @@ class BNNDynamics(AbstractDynamics):
         z = jnp.concatenate([expanded_x, u])
         input_stats = jtu.tree_map(lambda *w: jnp.concatenate(w), dynamics_model.data_stats.xs_after_angle_layer,
                                    dynamics_model.data_stats.us_stats)
-        f_data_stats = DataStatsFSVGD(input_stats=input_stats, output_stats=dynamics_model.data_stats.xs_dot_noise_stats)
+        f_data_stats = DataStatsFSVGD(input_stats=input_stats,
+                                      output_stats=dynamics_model.data_stats.xs_dot_noise_stats)
         xs_dot = vmap(self.BNN.apply_eval, in_axes=(0, 0, None, None))(dynamics_model.params,
                                                                        dynamics_model.model_stats, z, f_data_stats)
         return xs_dot
@@ -194,6 +197,10 @@ class BNNDynamics(AbstractDynamics):
             greedy_indices, potential_indices = greedy_largest_subdeterminant_jit(covariance_matrix, num_meas_array)
         elif self.measurement_collection_config.batch_strategy == BatchStrategy.MAX_KERNEL_DISTANCE_GREEDY:
             greedy_indices, potential_indices = greedy_distance_maximization_jit(covariance_matrix, num_meas_array)
+        elif self.measurement_collection_config.batch_strategy == BatchStrategy.EQUIDISTANT:
+            num_step = math.ceil(self.measurement_collection_config.num_interpolated_values // len(num_meas_array))
+            greedy_indices = jnp.arange(0, self.measurement_collection_config.num_interpolated_values, num_step).astype(
+                jnp.int32)
 
         ts_potential = ts_potential.reshape(-1, 1)
         proposed_ts = ts_potential[greedy_indices]
@@ -411,6 +418,10 @@ class GPDynamics(AbstractDynamics):
             greedy_indices, potential_indices = greedy_largest_subdeterminant_jit(covariance_matrix, num_meas_array)
         elif self.measurement_collection_config.batch_strategy == BatchStrategy.MAX_KERNEL_DISTANCE_GREEDY:
             greedy_indices, potential_indices = greedy_distance_maximization_jit(covariance_matrix, num_meas_array)
+        elif self.measurement_collection_config.batch_strategy == BatchStrategy.EQUIDISTANT:
+            num_step = math.ceil(self.measurement_collection_config.num_interpolated_values // len(num_meas_array))
+            greedy_indices = jnp.arange(0, self.measurement_collection_config.num_interpolated_values, num_step).astype(
+                jnp.int32)
 
         ts_potential = ts_potential.reshape(-1, 1)
         proposed_ts = ts_potential[greedy_indices]

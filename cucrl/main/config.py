@@ -100,7 +100,6 @@ class MeasurementCollectionConfig(NamedTuple):
     num_hallucination_nodes: int = 20
     num_interpolated_values: int = 100
     batch_strategy: BatchStrategy = BatchStrategy.MAX_KERNEL_DISTANCE_GREEDY
-    # Todo: compute the batch size based on the noise std of history
 
 
 class PolicyConfig(NamedTuple):

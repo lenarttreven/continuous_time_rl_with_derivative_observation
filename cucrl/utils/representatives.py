@@ -25,6 +25,7 @@ class Norm(Enum):
 class BatchStrategy(Enum):
     MAX_DETERMINANT_GREEDY = auto()
     MAX_KERNEL_DISTANCE_GREEDY = auto()
+    EQUIDISTANT = auto()
 
 
 class BNNTypes(Enum):

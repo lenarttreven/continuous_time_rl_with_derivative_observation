@@ -96,7 +96,7 @@ class LearnSystem:
         self.track_just_loss = config.logging.track_just_loss
         self.visualization = config.logging.visualization
         # Prepare beta exploration
-        self.beta_exploration = BetaExploration(delta=0.1, state_dim=self.state_dim, rkhs_bound=5,
+        self.beta_exploration = BetaExploration(delta=0.1, state_dim=self.state_dim, rkhs_bound=1,
                                                 type=self.config.interaction.policy.offline_planning.beta_exploration)
         optimal_cost = OptimalCost(simulator_dynamics=self.data_generator.simulator.simulator_dynamics,
                                    simulator_costs=self.simulator_costs,

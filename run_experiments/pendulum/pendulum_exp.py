@@ -1,11 +1,12 @@
 import argparse
 import os
+import time
 
 import jax.numpy as jnp
 import jax.random
+import wandb
 from jax.config import config
 
-import wandb
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig, SystemAssumptions
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
@@ -20,13 +21,8 @@ from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 
 config.update("jax_enable_x64", True)
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data_seed', type=int, default=0)
-    args = parser.parse_args()
 
-    data_generation_seed = args.data_seed
-
+def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: BatchStrategy):
     seed = 0
     num_matching_points = 50
     num_visualization_points = 1000
@@ -39,19 +35,14 @@ if __name__ == '__main__':
 
     track_wandb = True
     track_just_loss = True
-    debug = False
     visualization = True
-    numerical_correction = 0
 
     beta = 1
     state_dim = 2
     action_dim = 1
-    num_trajectories = len(initial_conditions)
-
 
     def initial_control(x, t):
         return jnp.sin(t).reshape(1, )
-
 
     run_config = RunConfig(
         seed=seed,
@@ -59,7 +50,7 @@ if __name__ == '__main__':
             scaling=Scaling(state_scaling=jnp.diag(jnp.array([1.0, 2.0])),
                             control_scaling=jnp.eye(action_dim),
                             time_scaling=jnp.ones(shape=(1,))),
-            data_generation_key=jax.random.PRNGKey(data_generation_seed),
+            data_generation_key=jax.random.PRNGKey(data_seed),
             simulator_step_size=0.001,
             simulator_type=SimulatorType.PENDULUM,
             simulator_params=simulator_parameters,
@@ -119,7 +110,7 @@ if __name__ == '__main__':
             ),
             measurement_collector=MeasurementCollectionConfig(
                 batch_size_per_time_horizon=10,
-                batch_strategy=BatchStrategy.EQUIDISTANT,
+                batch_strategy=measurement_selection_strategy,
                 noise_std=0.0,
                 time_horizon=TimeHorizonConfig(type=TimeHorizonType.FIXED, init_horizon=10.0),
                 num_hallucination_nodes=100,
@@ -143,7 +134,7 @@ if __name__ == '__main__':
     if track_wandb:
         home_folder = os.getcwd()
         home_folder = '/'.join(home_folder.split('/')[:4])
-        group_name = "Testing"
+        group_name = str(measurement_selection_strategy)
         if home_folder == '/cluster/home/trevenl':
             wandb.init(
                 dir='/cluster/scratch/trevenl',
@@ -157,8 +148,21 @@ if __name__ == '__main__':
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )
-        config = wandb.config
 
     model = LearnSystem(run_config)
     model.run_episodes(num_episodes=20, num_iter_training=8000)
     wandb.finish()
+
+
+def main(args):
+    t_start = time.time()
+    experiment(args.data_seed, BatchStrategy[args.measurement_selection_strategy])
+    print("Total time taken: ", time.time() - t_start, " seconds")
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_seed', type=int, default=0)
+    parser.add_argument('--measurement_selection_strategy', type=str, default='EQUIDISTANT')
+    args = parser.parse_args()
+    main(args)

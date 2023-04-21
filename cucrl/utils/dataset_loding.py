@@ -1,12 +1,15 @@
 from typing import NamedTuple
-from itertools import cycle
 
+import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from torch.utils.data import Dataset, DataLoader
 import torch
+from torch.utils.data import Dataset, DataLoader
+
 torch.manual_seed(0)
 
+
+@jax.jit
 def jax_collate(batch):
     return jtu.tree_map(lambda *x: jnp.stack(x), *batch)
 
@@ -43,4 +46,3 @@ print('New cycle')
 for batch in dataloader:
     print('Batch: ')
     print(batch.xs)
-
