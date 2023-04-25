@@ -146,7 +146,6 @@ class ComparatorConfig(NamedTuple):
 class RunConfig(NamedTuple):
     seed: int
     data_generation: DataGenerationConfig
-    smoother: SmootherConfig
     dynamics: DynamicsConfig
     interaction: InteractionConfig
     betas: BetasConfig

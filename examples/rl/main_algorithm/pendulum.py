@@ -31,7 +31,7 @@ if __name__ == '__main__':
     num_matching_points = 50
     num_visualization_points = 1000
 
-    initial_conditions = [jnp.array([jnp.pi, 0])]
+    initial_conditions = [jnp.array([jnp.pi / 2, 0])]
     time_horizon = (0, 10)
     noise_scalar = 0.01
     stds_for_simulation = jnp.array([noise_scalar, noise_scalar], dtype=jnp.float64)
@@ -75,14 +75,6 @@ if __name__ == '__main__':
                                                  max_state=100 * jnp.ones(shape=(state_dim,))),
 
         ),
-        smoother=SmootherConfig(
-            type=SmootherType.FSVGD_TIME_ONLY,
-            features=[64, 64, 64],
-            state_dim=state_dim,
-            num_particles=10,
-            bandwidth_prior=0.2,
-            bandwidth_svgd=0.2,
-        ),
         dynamics=DynamicsConfig(
             type=Dynamics.GP,
             features=[64, 64, 64],
@@ -96,8 +88,8 @@ if __name__ == '__main__':
             policy=PolicyConfig(
                 online_tracking=OnlineTrackingConfig(
                     mpc_dt=0.02,
-                    time_horizon=4.0,
-                    num_nodes=30,
+                    time_horizon=5.0,
+                    num_nodes=50,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(
@@ -119,7 +111,7 @@ if __name__ == '__main__':
             ),
             measurement_collector=MeasurementCollectionConfig(
                 batch_size_per_time_horizon=10,
-                batch_strategy=BatchStrategy.EQUIDISTANT,
+                batch_strategy=BatchStrategy.MAX_DETERMINANT_GREEDY,
                 noise_std=0.0,
                 time_horizon=TimeHorizonConfig(type=TimeHorizonType.FIXED, init_horizon=10.0),
                 num_hallucination_nodes=100,

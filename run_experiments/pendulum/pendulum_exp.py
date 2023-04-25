@@ -10,13 +10,13 @@ from jax.config import config
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig, SystemAssumptions
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
-from cucrl.main.config import RunConfig, DataGenerationConfig, SmootherConfig, DynamicsConfig, InteractionConfig
+from cucrl.main.config import RunConfig, DataGenerationConfig, DynamicsConfig, InteractionConfig
 from cucrl.main.learn_system import LearnSystem
 from cucrl.schedules.betas import BetasType
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.helper_functions import namedtuple_to_dict
+from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, BNNTypes
 from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, NumericalComputation, Norm, BetaType
-from cucrl.utils.representatives import SmootherType, ExplorationStrategy, DynamicsTracking, BNNTypes
 from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 
 config.update("jax_enable_x64", True)
@@ -27,7 +27,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
     num_matching_points = 50
     num_visualization_points = 1000
 
-    initial_conditions = [jnp.array([jnp.pi, 0])]
+    initial_conditions = [jnp.array([jnp.pi / 2, 0])]
     time_horizon = (0, 10)
     noise_scalar = 0.01
     stds_for_simulation = jnp.array([noise_scalar, noise_scalar], dtype=jnp.float64)
@@ -65,14 +65,6 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
                                                  limited_budget=False,
                                                  max_state=100 * jnp.ones(shape=(state_dim,))),
 
-        ),
-        smoother=SmootherConfig(
-            type=SmootherType.FSVGD_TIME_ONLY,
-            features=[64, 64, 64],
-            state_dim=state_dim,
-            num_particles=10,
-            bandwidth_prior=0.2,
-            bandwidth_svgd=0.2,
         ),
         dynamics=DynamicsConfig(
             type=Dynamics.GP,
