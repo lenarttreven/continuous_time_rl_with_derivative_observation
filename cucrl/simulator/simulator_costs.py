@@ -194,6 +194,11 @@ class MountainCar(SimulatorCostsAndConstraints):
         self.terminal_q = jnp.eye(self.state_dim)
         self.terminal_r = jnp.eye(self.control_dim)
 
+        self.tracking_q = jnp.eye(self.state_dim)
+        self.tracking_r = jnp.eye(self.control_dim)
+        self.tracking_q_T = jnp.eye(self.state_dim)
+        self.tracking_r_T = jnp.zeros(self.control_dim)
+
     def _running_cost(self, x, u):
         return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.running_q,
                               r=self.running_r)
@@ -204,6 +209,14 @@ class MountainCar(SimulatorCostsAndConstraints):
 
     def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
         return jnp.array([0.0])
+
+    def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
+
+    def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 
 
 class Bicycle(SimulatorCostsAndConstraints):
@@ -371,10 +384,16 @@ class CartPole(SimulatorCostsAndConstraints):
                          state_scaling=state_scaling, control_scaling=control_scaling)
         self.state_target = jnp.array([0.0, 0.0, 0.0, 0.0], dtype=jnp.float64)
         self.action_target = jnp.array([0.0])
+
         self.running_q = jnp.eye(self.state_dim)
         self.running_r = jnp.eye(self.control_dim)
         self.terminal_q = jnp.eye(self.state_dim)
         self.terminal_r = jnp.eye(self.control_dim)
+
+        self.tracking_q = jnp.eye(self.state_dim)
+        self.tracking_r = jnp.eye(self.control_dim)
+        self.tracking_q_T = jnp.eye(self.state_dim)
+        self.tracking_r_T = 0 * jnp.eye(self.control_dim)
 
     def _running_cost(self, x, u):
         return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.running_q,
@@ -386,6 +405,14 @@ class CartPole(SimulatorCostsAndConstraints):
 
     def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
         return jnp.array([0.0])
+
+    def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
+
+    def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 
 
 class QuadrotorQuaternions(SimulatorCostsAndConstraints):

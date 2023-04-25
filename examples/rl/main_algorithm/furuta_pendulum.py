@@ -1,12 +1,11 @@
 import argparse
 import os
-import time
 
 import jax.numpy as jnp
 import jax.random
-import wandb
 from jax.config import config
 
+import wandb
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig, SystemAssumptions
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
@@ -21,41 +20,53 @@ from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 
 config.update("jax_enable_x64", True)
 
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_seed', type=int, default=0)
+    args = parser.parse_args()
 
-def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: BatchStrategy):
+    data_generation_seed = args.data_seed
+
     seed = 0
     num_matching_points = 50
     num_visualization_points = 1000
+    num_observation_points = 100
 
-    initial_conditions = [jnp.array([jnp.pi, 0])]
+    my_initial_conditions = [jnp.array([0.0, 0.0, jnp.pi, 0.0], dtype=jnp.float64)]
     time_horizon = (0, 10)
     noise_scalar = 0.01
-    stds_for_simulation = jnp.array([noise_scalar, noise_scalar], dtype=jnp.float64)
-    simulator_parameters = {'system_params': jnp.array([5.0, 9.81], jnp.float64)}
+
+    beta = 1
+    state_dim = 4
+    action_dim = 1
+    num_trajectories = len(my_initial_conditions)
+
+    my_stds_for_simulation = jnp.array(state_dim * [noise_scalar], dtype=jnp.float64)
+    my_simulator_parameters = {}
 
     track_wandb = True
     track_just_loss = True
+    debug = False
     visualization = True
+    numerical_correction = 0
 
-    beta = 1
-    state_dim = 2
-    action_dim = 1
 
     def initial_control(x, t):
         return jnp.sin(t).reshape(1, )
 
+
     run_config = RunConfig(
         seed=seed,
         data_generation=DataGenerationConfig(
-            scaling=Scaling(state_scaling=jnp.diag(jnp.array([1.0, 2.0])),
+            scaling=Scaling(state_scaling=jnp.eye(state_dim),
                             control_scaling=jnp.eye(action_dim),
                             time_scaling=jnp.ones(shape=(1,))),
-            data_generation_key=jax.random.PRNGKey(data_seed),
+            data_generation_key=jax.random.PRNGKey(data_generation_seed),
             simulator_step_size=0.001,
-            simulator_type=SimulatorType.PENDULUM,
-            simulator_params=simulator_parameters,
-            noise=stds_for_simulation,
-            initial_conditions=initial_conditions,
+            simulator_type=SimulatorType.FURUTA_PENUDLUM,
+            simulator_params=my_simulator_parameters,
+            noise=my_stds_for_simulation,
+            initial_conditions=my_initial_conditions,
             time_horizon=time_horizon,
             num_matching_points=num_matching_points,
             num_visualization_points=num_visualization_points,
@@ -67,7 +78,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
 
         ),
         dynamics=DynamicsConfig(
-            type=Dynamics.GP,
+            type=Dynamics.BNN,
             features=[64, 64, 64],
             num_particles=10,
             bandwidth_prior=3.0,
@@ -79,8 +90,8 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
             policy=PolicyConfig(
                 online_tracking=OnlineTrackingConfig(
                     mpc_dt=0.02,
-                    time_horizon=6.0,
-                    num_nodes=50,
+                    time_horizon=3.0,
+                    num_nodes=100,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(
@@ -89,11 +100,11 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
                     exploration_norm=Norm.L_INF,
                     numerical_method=NumericalComputation.LGL,
                     num_nodes=100,
-                    beta_exploration=BetaType.GP
+                    beta_exploration=BetaType.BNN
                 ),
                 initial_control=initial_control,
             ),
-            angles_dim=[0, ],
+            angles_dim=[0, 2],
             system_assumptions=SystemAssumptions(
                 l_f=jnp.array(1.0, dtype=jnp.float64),
                 l_pi=jnp.array(1.0, dtype=jnp.float64),
@@ -101,8 +112,8 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
                 hallucination_error=jnp.array(10.0, dtype=jnp.float64)
             ),
             measurement_collector=MeasurementCollectionConfig(
-                batch_size_per_time_horizon=10,
-                batch_strategy=measurement_selection_strategy,
+                batch_size_per_time_horizon=num_observation_points,
+                batch_strategy=BatchStrategy.MAX_DETERMINANT_GREEDY,
                 noise_std=0.0,
                 time_horizon=TimeHorizonConfig(type=TimeHorizonType.FIXED, init_horizon=10.0),
                 num_hallucination_nodes=100,
@@ -111,50 +122,37 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
         ),
         betas=BetasConfig(type=BetasType.CONSTANT, kwargs={'value': beta, 'num_dim': state_dim}),
         optimizers=OptimizersConfig(
-            no_batching=True,
+            no_batching=False,
             batch_size=BatchSize(dynamics=64),
-            dynamics_training=OptimizerConfig(type=Optimizer.ADAM, wd=0.0,
+            dynamics_training=OptimizerConfig(type=Optimizer.ADAM, wd=0.1,
                                               learning_rate=LearningRate(type=LearningRateType.PIECEWISE_CONSTANT,
                                                                          kwargs={'boundaries': [10 ** 4],
-                                                                                 'values': [0.1, 0.01]}, )
+                                                                                 'values': [0.01, 0.001]}, )
                                               ),
         ),
         logging=LoggingConfig(track_wandb=track_wandb, track_just_loss=track_just_loss, visualization=visualization),
-        comparator=ComparatorConfig(num_discrete_points=10)
+        comparator=ComparatorConfig(num_discrete_points=num_observation_points)
     )
 
     if track_wandb:
         home_folder = os.getcwd()
         home_folder = '/'.join(home_folder.split('/')[:4])
-        group_name = str(measurement_selection_strategy)
+        group_name = "Testing"
         if home_folder == '/cluster/home/trevenl':
             wandb.init(
                 dir='/cluster/scratch/trevenl',
-                project="Pendulum mpc horizon 6",
+                project="Furuta Pendulum",
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )
         else:
             wandb.init(
-                project="Pendulum mpc horizon 6",
+                project="Furuta Pendulum",
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )
+        config = wandb.config
 
     model = LearnSystem(run_config)
     model.run_episodes(num_episodes=20, num_iter_training=8000)
     wandb.finish()
-
-
-def main(args):
-    t_start = time.time()
-    experiment(args.data_seed, BatchStrategy[args.measurement_selection_strategy])
-    print("Total time taken: ", time.time() - t_start, " seconds")
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data_seed', type=int, default=0)
-    parser.add_argument('--measurement_selection_strategy', type=str, default='EQUIDISTANT')
-    args = parser.parse_args()
-    main(args)
