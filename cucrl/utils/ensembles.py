@@ -216,7 +216,7 @@ if __name__ == '__main__':
     normalizer = Normalizer(state_dim=input_dim, action_dim=output_dim, angle_layer=angle_layer)
 
     num_particles = 10
-    model = DeterministicEnsemble(input_dim=input_dim, output_dim=output_dim, features=[64, 64, 64, 64],
+    model = DeterministicEnsemble(input_dim=input_dim, output_dim=output_dim, features=[64, 64, 64],
                                   num_particles=num_particles, normalizer=normalizer)
 
     train_data = DataRepr(xs=xs, ys=ys)

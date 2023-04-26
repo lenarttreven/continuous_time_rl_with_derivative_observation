@@ -6,7 +6,7 @@ import jax.random
 from jax.config import config
 
 import wandb
-from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig, SystemAssumptions
+from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
 from cucrl.main.config import RunConfig, DataGenerationConfig, DynamicsConfig, InteractionConfig
@@ -30,19 +30,20 @@ if __name__ == '__main__':
     seed = 0
     num_matching_points = 50
     num_visualization_points = 1000
-    num_observation_points = 100
+    num_observation_points = 20
 
-    my_initial_conditions = [jnp.array([0.0, 0.0, jnp.pi, 0.0], dtype=jnp.float64)]
+    my_initial_conditions = [jnp.array([0.0, 0.0, 0.0, 0.0])]
+
     time_horizon = (0, 10)
-    noise_scalar = 0.01
 
     beta = 1
     state_dim = 4
-    action_dim = 1
+    action_dim = 2
     num_trajectories = len(my_initial_conditions)
 
-    my_stds_for_simulation = jnp.array(state_dim * [noise_scalar], dtype=jnp.float64)
-    my_simulator_parameters = {}
+    noise_scalar = 0.01
+    my_stds_for_simulation = noise_scalar * jnp.ones(shape=(4,), dtype=jnp.float64)
+    my_simulator_parameters = {'system_params': jnp.array([0.1], jnp.float64)}
 
     track_wandb = True
     track_just_loss = True
@@ -52,7 +53,7 @@ if __name__ == '__main__':
 
 
     def initial_control(x, t):
-        return jnp.sin(t).reshape(1, )
+        return jnp.array([jnp.sin(t).reshape(), jnp.cos(t).reshape()], dtype=jnp.float64)
 
 
     run_config = RunConfig(
@@ -63,7 +64,7 @@ if __name__ == '__main__':
                             time_scaling=jnp.ones(shape=(1,))),
             data_generation_key=jax.random.PRNGKey(data_generation_seed),
             simulator_step_size=0.001,
-            simulator_type=SimulatorType.FURUTA_PENUDLUM,
+            simulator_type=SimulatorType.BICYCLE,
             simulator_params=my_simulator_parameters,
             noise=my_stds_for_simulation,
             initial_conditions=my_initial_conditions,
@@ -78,7 +79,7 @@ if __name__ == '__main__':
 
         ),
         dynamics=DynamicsConfig(
-            type=Dynamics.BNN,
+            type=Dynamics.GP,
             features=[64, 64, 64],
             num_particles=10,
             bandwidth_prior=3.0,
@@ -91,7 +92,7 @@ if __name__ == '__main__':
                 online_tracking=OnlineTrackingConfig(
                     mpc_dt=0.02,
                     time_horizon=5.0,
-                    num_nodes=200,
+                    num_nodes=50,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(
@@ -99,14 +100,14 @@ if __name__ == '__main__':
                     exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA_TIME,
                     exploration_norm=Norm.L_INF,
                     numerical_method=NumericalComputation.LGL,
-                    num_nodes=1000,
-                    beta_exploration=BetaType.BNN
+                    num_nodes=100,
+                    beta_exploration=BetaType.GP
                 ),
                 initial_control=initial_control,
             ),
-            angles_dim=[0, 2],
+            angles_dim=[0, ],
             measurement_collector=MeasurementCollectionConfig(
-                batch_size_per_time_horizon=num_observation_points,
+                batch_size_per_time_horizon=10,
                 batch_strategy=BatchStrategy.MAX_DETERMINANT_GREEDY,
                 noise_std=0.0,
                 time_horizon=TimeHorizonConfig(type=TimeHorizonType.FIXED, init_horizon=10.0),
@@ -135,13 +136,13 @@ if __name__ == '__main__':
         if home_folder == '/cluster/home/trevenl':
             wandb.init(
                 dir='/cluster/scratch/trevenl',
-                project="Furuta Pendulum",
+                project="Bicycle",
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )
         else:
             wandb.init(
-                project="Furuta Pendulum",
+                project="Bicycle",
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )
