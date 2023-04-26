@@ -11,3 +11,8 @@ def jax_has_gpu():
 
 if __name__ == '__main__':
     jax_has_gpu()
+    print('Jax done')
+    import tensorflow as tf
+
+    print(tf.config.list_physical_devices('GPU'))
+    print('Done')

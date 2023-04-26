@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import optax
 import tensorflow as tf
 import tensorflow_datasets as tfds
+import wandb
 from flax import linen as nn
 from flax.core import FrozenDict
 from jax import random, vmap, jit
@@ -122,6 +123,7 @@ class DeterministicEnsemble:
                                                             data_stats, data_std_batch, subkey,
                                                             num_train_points)
 
+            wandb.log({"loss": loss})
             if step >= num_epochs:
                 break
 
@@ -215,15 +217,20 @@ if __name__ == '__main__':
                                      state_scaling=jnp.eye(input_dim), )
     normalizer = Normalizer(state_dim=input_dim, action_dim=output_dim, angle_layer=angle_layer)
 
-    num_particles = 10
+    num_particles = 1
     model = DeterministicEnsemble(input_dim=input_dim, output_dim=output_dim, features=[64, 64, 64],
                                   num_particles=num_particles, normalizer=normalizer)
 
     train_data = DataRepr(xs=xs, ys=ys)
     start_time = time.time()
+    print('Starting with training')
+    wandb.init(
+        project="Pendulum",
+        group='test group',
+    )
 
-    model_params, model_stats = model.fit_model(dataset=train_data, num_epochs=4000, data_stats=data_stats,
-                                                data_std=data_std, batch_size=32)
+    model_params, model_stats = model.fit_model(dataset=train_data, num_epochs=100, data_stats=data_stats,
+                                                data_std=data_std, batch_size=16)
     print(f"Training time: {time.time() - start_time:.2f} seconds")
 
     test_xs = jnp.linspace(-5, 15, 1000).reshape(-1, 1)
