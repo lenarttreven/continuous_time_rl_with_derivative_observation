@@ -7,7 +7,7 @@ import jax.random
 import wandb
 from jax.config import config
 
-from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig, SystemAssumptions
+from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
 from cucrl.main.config import RunConfig, DataGenerationConfig, DynamicsConfig, InteractionConfig
@@ -22,7 +22,7 @@ from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 config.update("jax_enable_x64", True)
 
 
-def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: BatchStrategy):
+def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: BatchStrategy, project_name: str):
     seed = 0
     num_matching_points = 50
     num_visualization_points = 1000
@@ -42,7 +42,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
     action_dim = 1
 
     def initial_control(x, t):
-        return jnp.sin(t).reshape(1, )
+        return 0.1 * jnp.sin(t).reshape(1, )
 
     run_config = RunConfig(
         seed=seed,
@@ -94,12 +94,6 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
                 initial_control=initial_control,
             ),
             angles_dim=[0, ],
-            system_assumptions=SystemAssumptions(
-                l_f=jnp.array(1.0, dtype=jnp.float64),
-                l_pi=jnp.array(1.0, dtype=jnp.float64),
-                l_sigma=jnp.array(1.0, dtype=jnp.float64),
-                hallucination_error=jnp.array(10.0, dtype=jnp.float64)
-            ),
             measurement_collector=MeasurementCollectionConfig(
                 batch_size_per_time_horizon=10,
                 batch_strategy=measurement_selection_strategy,
@@ -130,13 +124,13 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
         if home_folder == '/cluster/home/trevenl':
             wandb.init(
                 dir='/cluster/scratch/trevenl',
-                project="Pendulum mpc horizon 6",
+                project=project_name,
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )
         else:
             wandb.init(
-                project="Pendulum mpc horizon 6",
+                project=project_name,
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )
@@ -148,7 +142,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
 
 def main(args):
     t_start = time.time()
-    experiment(args.data_seed, BatchStrategy[args.measurement_selection_strategy])
+    experiment(args.data_seed, BatchStrategy[args.measurement_selection_strategy], args.project_name)
     print("Total time taken: ", time.time() - t_start, " seconds")
 
 
@@ -156,5 +150,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_seed', type=int, default=0)
     parser.add_argument('--measurement_selection_strategy', type=str, default='EQUIDISTANT')
+    parser.add_argument('--project_name', type=str, default='Pendulum')
     args = parser.parse_args()
     main(args)

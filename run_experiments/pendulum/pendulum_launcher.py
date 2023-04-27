@@ -2,6 +2,8 @@ import pendulum_exp
 from cucrl.utils.representatives import BatchStrategy
 from run_experiments.util import generate_base_command, generate_run_commands
 
+PROJECT_NAME = "Pendulum_small_input_control"
+
 applicable_configs = {
     'MSS': [BatchStrategy.MAX_KERNEL_DISTANCE_GREEDY, BatchStrategy.MAX_DETERMINANT_GREEDY, BatchStrategy.EQUIDISTANT],
     'data_seed': [i for i in range(10)],
@@ -15,6 +17,7 @@ def main():
             flags = {
                 'measurement_selection_strategy': mss.name,
                 'data_seed': data_seed,
+                'project_name': PROJECT_NAME
             }
 
             cmd = generate_base_command(pendulum_exp, flags=flags)

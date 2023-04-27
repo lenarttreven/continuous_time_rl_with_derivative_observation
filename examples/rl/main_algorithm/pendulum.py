@@ -9,13 +9,13 @@ import wandb
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig, SystemAssumptions
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
-from cucrl.main.config import RunConfig, DataGenerationConfig, SmootherConfig, DynamicsConfig, InteractionConfig
+from cucrl.main.config import RunConfig, DataGenerationConfig, DynamicsConfig, InteractionConfig
 from cucrl.main.learn_system import LearnSystem
 from cucrl.schedules.betas import BetasType
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.helper_functions import namedtuple_to_dict
+from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, BNNTypes
 from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, NumericalComputation, Norm, BetaType
-from cucrl.utils.representatives import SmootherType, ExplorationStrategy, DynamicsTracking, BNNTypes
 from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 
 config.update("jax_enable_x64", True)
