@@ -24,7 +24,7 @@ from cucrl.main.handlers import Keys, DataRepr, VisualisationData
 from cucrl.objectives.objectives import Objectives
 from cucrl.offline_planner.offline_planner import get_offline_planner
 from cucrl.optimal_cost.best_possible_discrete_time import BestPossibleDiscreteAlgorithm
-from cucrl.optimal_cost.optimal_cost import OptimalCost
+from cucrl.optimal_cost.optimal_cost_ilqr import OptimalCost
 from cucrl.plotter.plotter import Plotter
 from cucrl.schedules.learning_rate import get_learning_rate
 from cucrl.simulator.simulator_costs import get_simulator_costs

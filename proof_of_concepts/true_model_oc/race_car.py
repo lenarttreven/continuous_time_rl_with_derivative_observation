@@ -5,11 +5,18 @@ from trajax.optimizers import ILQRHyperparams, ILQR
 
 from cucrl.simulator.simulator_costs import RaceCar as RaceCarCost
 from cucrl.simulator.simulator_dynamics import RaceCar
+from cucrl.main.config import Scaling
 
 
 def run_race_car():
-    dynamics_model = RaceCar()
-    costs = RaceCarCost()
+    state_dim = 6
+    action_dim = 2
+    scaling = Scaling(state_scaling=jnp.diag(jnp.array([1.0, 1.0, 1.0, 1.0, 10.0, 1.0])),
+                      control_scaling=jnp.eye(action_dim),
+                      time_scaling=jnp.ones(shape=(1,)))
+
+    dynamics_model = RaceCar(state_scaling=scaling.state_scaling)
+    costs = RaceCarCost(state_scaling=scaling.state_scaling)
 
     x_dim = dynamics_model.state_dim
     u_dim = dynamics_model.control_dim
