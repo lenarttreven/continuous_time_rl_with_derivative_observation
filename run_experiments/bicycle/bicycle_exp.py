@@ -1,11 +1,12 @@
 import argparse
 import os
+import time
 
 import jax.numpy as jnp
 import jax.random
+import wandb
 from jax.config import config
 
-import wandb
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
@@ -20,29 +21,25 @@ from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 
 config.update("jax_enable_x64", True)
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data_seed', type=int, default=0)
-    args = parser.parse_args()
 
-    data_generation_seed = args.data_seed
-
+def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: BatchStrategy, project_name: str):
     seed = 0
     num_matching_points = 50
     num_visualization_points = 1000
-    num_observation_points = 20
+    num_observation_points = 10
 
-    my_initial_conditions = [jnp.array([0.0, 0.0, jnp.pi, 0.0], dtype=jnp.float64)]
+    my_initial_conditions = [jnp.array([0.0, 0.0, 0.0, 0.0])]
+
     time_horizon = (0, 10)
-    noise_scalar = 0.01
 
     beta = 1
     state_dim = 4
-    action_dim = 1
+    action_dim = 2
     num_trajectories = len(my_initial_conditions)
 
-    my_stds_for_simulation = jnp.array(state_dim * [noise_scalar], dtype=jnp.float64)
-    my_simulator_parameters = {}
+    noise_scalar = 0.01
+    my_stds_for_simulation = noise_scalar * jnp.ones(shape=(4,), dtype=jnp.float64)
+    my_simulator_parameters = {'system_params': jnp.array([0.1], jnp.float64)}
 
     track_wandb = True
     track_just_loss = True
@@ -52,8 +49,7 @@ if __name__ == '__main__':
 
 
     def initial_control(x, t):
-        return jnp.sin(t).reshape(1, )
-
+        return jnp.array([jnp.sin(t).reshape(), jnp.cos(t).reshape()], dtype=jnp.float64)
 
     run_config = RunConfig(
         seed=seed,
@@ -61,9 +57,9 @@ if __name__ == '__main__':
             scaling=Scaling(state_scaling=jnp.eye(state_dim),
                             control_scaling=jnp.eye(action_dim),
                             time_scaling=jnp.ones(shape=(1,))),
-            data_generation_key=jax.random.PRNGKey(data_generation_seed),
+            data_generation_key=jax.random.PRNGKey(data_seed),
             simulator_step_size=0.001,
-            simulator_type=SimulatorType.FURUTA_PENUDLUM,
+            simulator_type=SimulatorType.BICYCLE,
             simulator_params=my_simulator_parameters,
             noise=my_stds_for_simulation,
             initial_conditions=my_initial_conditions,
@@ -91,7 +87,7 @@ if __name__ == '__main__':
                 online_tracking=OnlineTrackingConfig(
                     mpc_dt=0.02,
                     time_horizon=5.0,
-                    num_nodes=200,
+                    num_nodes=50,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(
@@ -99,15 +95,15 @@ if __name__ == '__main__':
                     exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA_TIME,
                     exploration_norm=Norm.L_INF,
                     numerical_method=NumericalComputation.LGL,
-                    num_nodes=1000,
+                    num_nodes=100,
                     beta_exploration=BetaType.GP
                 ),
                 initial_control=initial_control,
             ),
-            angles_dim=[0, 2],
+            angles_dim=[0, ],
             measurement_collector=MeasurementCollectionConfig(
-                batch_size_per_time_horizon=num_observation_points,
-                batch_strategy=BatchStrategy.MAX_DETERMINANT_GREEDY,
+                batch_size_per_time_horizon=10,
+                batch_strategy=measurement_selection_strategy,
                 noise_std=0.0,
                 time_horizon=TimeHorizonConfig(type=TimeHorizonType.FIXED, init_horizon=10.0),
                 num_hallucination_nodes=100,
@@ -121,7 +117,7 @@ if __name__ == '__main__':
             dynamics_training=OptimizerConfig(type=Optimizer.ADAM, wd=0.1,
                                               learning_rate=LearningRate(type=LearningRateType.PIECEWISE_CONSTANT,
                                                                          kwargs={'boundaries': [10 ** 4],
-                                                                                 'values': [0.01, 0.001]}, )
+                                                                                 'values': [0.1, 0.01]}, )
                                               ),
         ),
         logging=LoggingConfig(track_wandb=track_wandb, track_just_loss=track_just_loss, visualization=visualization),
@@ -131,22 +127,36 @@ if __name__ == '__main__':
     if track_wandb:
         home_folder = os.getcwd()
         home_folder = '/'.join(home_folder.split('/')[:4])
-        group_name = "Testing"
+        group_name = str(measurement_selection_strategy)
         if home_folder == '/cluster/home/trevenl':
             wandb.init(
                 dir='/cluster/scratch/trevenl',
-                project="Furuta Pendulum",
+                project=project_name,
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )
         else:
             wandb.init(
-                project="Furuta Pendulum",
+                project=project_name,
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )
-        config = wandb.config
 
     model = LearnSystem(run_config)
     model.run_episodes(num_episodes=20, num_iter_training=8000)
     wandb.finish()
+
+
+def main(args):
+    t_start = time.time()
+    experiment(args.data_seed, BatchStrategy[args.measurement_selection_strategy], args.project_name)
+    print("Total time taken: ", time.time() - t_start, " seconds")
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_seed', type=int, default=0)
+    parser.add_argument('--measurement_selection_strategy', type=str, default='EQUIDISTANT')
+    parser.add_argument('--project_name', type=str, default='Pendulum')
+    args = parser.parse_args()
+    main(args)

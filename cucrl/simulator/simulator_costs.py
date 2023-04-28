@@ -7,6 +7,7 @@ from jax import jit
 
 from cucrl.cost.quadratic_cost import quadratic_cost
 from cucrl.main.config import Scaling
+from cucrl.utils.race_car_params import CarParams
 from cucrl.utils.representatives import SimulatorType
 
 pytree = Any
@@ -219,6 +220,47 @@ class MountainCar(SimulatorCostsAndConstraints):
                               u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 
 
+class RaceCar(SimulatorCostsAndConstraints):
+    def __init__(self, system_params: CarParams = CarParams(), time_scaling=None, state_scaling=None,
+                 control_scaling=None):
+        super().__init__(state_dim=6, control_dim=2, system_params=system_params, time_scaling=time_scaling,
+                         state_scaling=state_scaling, control_scaling=control_scaling)
+        self.state_target = jnp.array([5, -2, 0, 0, 0, 0], dtype=jnp.float64)
+        self.action_target = jnp.array([0, 0], dtype=jnp.float64)
+        self.running_q = jnp.eye(self.state_dim)
+        self.running_r = jnp.eye(self.control_dim)
+        self.terminal_q = 0 * jnp.eye(self.state_dim)
+        self.terminal_r = 0 * jnp.eye(self.control_dim)
+
+        self.tracking_q = jnp.eye(self.state_dim)
+        self.tracking_r = jnp.eye(self.control_dim)
+        self.tracking_q_T = 5 * jnp.eye(self.state_dim)
+        self.tracking_r_T = jnp.zeros(self.control_dim)
+
+    def _running_cost(self, x, u):
+        u = jnp.tanh(u)
+        u = u.at[0].set(u[0] * self.system_params.max_steering)
+        return 10 * jnp.sum(u ** 2) + jnp.sum((x[:2] - self.state_target[:2]) ** 2)
+
+    def _terminal_cost(self, x, u):
+        return jnp.zeros(shape=())
+        # u = jnp.tanh(u)
+        # u = u.at[0].set(u[0] * self.system_params.max_steering)
+        # return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.terminal_q,
+        #                       r=self.terminal_r)
+
+    def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return jnp.array([0.0])
+
+    def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
+
+    def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
+
+
 class Bicycle(SimulatorCostsAndConstraints):
     """
     Dynamics of pendulum
@@ -235,6 +277,11 @@ class Bicycle(SimulatorCostsAndConstraints):
         self.terminal_q = jnp.eye(self.state_dim)
         self.terminal_r = jnp.eye(self.control_dim)
 
+        self.tracking_q = jnp.eye(self.state_dim)
+        self.tracking_r = jnp.eye(self.control_dim)
+        self.tracking_q_T = 5 * jnp.eye(self.state_dim)
+        self.tracking_r_T = 0 * jnp.eye(self.control_dim)
+
     def _running_cost(self, x, u):
         return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.running_q,
                               r=self.running_r)
@@ -245,6 +292,14 @@ class Bicycle(SimulatorCostsAndConstraints):
 
     def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
         return jnp.array([0.0])
+
+    def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
+
+    def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 
 
 class VanDerPolOscilator(SimulatorCostsAndConstraints):
@@ -322,7 +377,7 @@ class FurutaPendulum(SimulatorCostsAndConstraints):
 
         self.tracking_q = jnp.eye(self.state_dim)
         self.tracking_r = jnp.eye(self.control_dim)
-        self.tracking_q_T = jnp.eye(self.state_dim)
+        self.tracking_q_T = 5 * jnp.eye(self.state_dim)
         self.tracking_r_T = 0 * jnp.eye(self.control_dim)
 
     def _running_cost(self, x, u):
@@ -517,3 +572,5 @@ def get_simulator_costs(simulator: SimulatorType, scaling: Scaling) -> Simulator
         return QuadrotorEuler(**scaling._asdict())
     elif simulator == SimulatorType.QUADROTOR_2D:
         return Quadrotor2D(**scaling._asdict())
+    elif simulator == SimulatorType.RACE_CAR:
+        return RaceCar(**scaling._asdict())

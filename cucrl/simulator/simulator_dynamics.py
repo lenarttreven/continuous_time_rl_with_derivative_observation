@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from functools import partial
 from typing import Tuple, Any
 
+import jax
 import jax.numpy as jnp
 import mujoco
 from jax import jit, pure_callback
@@ -11,6 +12,7 @@ from cucrl.main.config import Scaling
 from cucrl.simulator.prepare_matrix import create_matrix
 from cucrl.utils.euler_angles import euler_to_rotation, move_frame
 from cucrl.utils.quaternions import Quaternion
+from cucrl.utils.race_car_params import CarParams
 from cucrl.utils.representatives import SimulatorType
 
 pytree = Any
@@ -641,6 +643,154 @@ class QuadrotorQuaternions(SimulatorDynamics):
                           state_dot_7, state_dot_8, state_dot_9, state_dot_10, state_dot_11, state_dot_12])
 
 
+class RaceCar(SimulatorDynamics):
+
+    def __init__(self, system_params: CarParams = CarParams(), time_scaling=None, state_scaling=None,
+                 control_scaling=None):
+        super().__init__(state_dim=6, control_dim=2, system_params=system_params, time_scaling=time_scaling,
+                         state_scaling=state_scaling, control_scaling=control_scaling)
+
+    def _ode_dyn(self, x: jax.Array, u: jax.Array, params: CarParams):
+        theta, v_x, v_y, w = x[..., 2], x[..., 3], x[..., 4], x[..., 5]
+        p_x_dot = v_x * jnp.cos(theta) - v_y * jnp.sin(theta)
+        p_y_dot = v_x * jnp.sin(theta) + v_y * jnp.cos(theta)
+        theta_dot = w
+        p_x_dot = jnp.array([p_x_dot, p_y_dot, theta_dot]).T
+
+        accelerations = self._accelerations_dyn(x, u, params).T
+
+        x_dot = jnp.concatenate([p_x_dot, accelerations], axis=-1)
+        return x_dot
+
+    @staticmethod
+    def _accelerations_dyn(x: jax.Array, u: jax.Array, params: CarParams):
+        i_com = params._get_moment_of_intertia()
+        theta, v_x, v_y, w = x[..., 2], x[..., 3], x[..., 4], x[..., 5]
+        m = params.m
+        l = params.l
+        d_f = params.d_f * params.g * m
+        d_r = params.d_r * params.g * m
+        c_f = params.c_f
+        c_r = params.c_r
+        b_f = params.b_f
+        b_r = params.b_r
+        c_m_1 = params.c_m_1
+        c_m_2 = params.c_m_2
+        c_d_max = params.c_d_max
+        c_d_min = params.c_d_min
+        c_rr = params.c_rr
+        a = params.a
+        l_r = params._get_x_com()
+        l_f = l - l_r
+        tv_p = params.tv_p
+
+        c_d = c_d_min + (c_d_max - c_d_min) * a
+
+        delta, d = u[..., 0], u[..., 1]
+        delta = jnp.clip(delta, a_min=-params.max_steering,
+                         a_max=params.max_steering)
+        d = jnp.clip(d, a_min=-1, a_max=1)
+
+        w_tar = delta * v_x / l
+
+        alpha_f = -jnp.arctan(
+            (w * l_f + v_y) /
+            (v_x + 1e-6)
+        ) + delta
+        alpha_r = jnp.arctan(
+            (w * l_r - v_y) /
+            (v_x + 1e-6)
+        )
+        f_f_y = d_f * jnp.sin(c_f * jnp.arctan(b_f * alpha_f))
+        f_r_y = d_r * jnp.sin(c_r * jnp.arctan(b_r * alpha_r))
+        f_r_x = (c_m_1 - c_m_2 * v_x) * d - c_rr - c_d * v_x * v_x
+
+        v_x_dot = (f_r_x - f_f_y * jnp.sin(delta) + m * v_y * w) / m
+        v_y_dot = (f_r_y + f_f_y * jnp.cos(delta) - m * v_x * w) / m
+        w_dot = (f_f_y * l_f * jnp.cos(delta) - f_r_y * l_r + tv_p * (w_tar - w)) / i_com
+
+        acceleration = jnp.asarray([v_x_dot, v_y_dot, w_dot])
+        return acceleration
+
+    @staticmethod
+    def _ode_kin(x: jax.Array, u: jax.Array, params: CarParams):
+        p_x, p_y, theta, v_x = x[..., 0], x[..., 1], x[..., 2], x[..., 3]
+        m = params.m
+        l = params.l
+        c_m_1 = params.c_m_1
+        c_m_2 = params.c_m_2
+        c_d_max = params.c_d_max
+        c_d_min = params.c_d_min
+        c_rr = params.c_rr
+        a = params.a
+        l_r = params._get_x_com()
+
+        c_d = c_d_min + (c_d_max - c_d_min) * a
+
+        delta, d = jnp.atleast_1d(u[..., 0]), jnp.atleast_1d(u[..., 1])
+
+        d_0 = (c_rr + c_d * v_x * v_x - c_m_2 * v_x) / (c_m_1 - c_m_2 * v_x)
+        d_slow = jnp.maximum(d, d_0)
+        d_fast = d
+        slow_ind = v_x <= 0.1
+        d_applied = d_slow * slow_ind + d_fast * (~slow_ind)
+        f_r_x = ((c_m_1 - c_m_2 * v_x) * d_applied - c_rr - c_d * v_x * v_x) / m
+
+        beta = jnp.arctan(l_r * jnp.arctan(delta) / l)
+        p_x_dot = v_x * jnp.cos(beta + theta)  # s_dot
+        p_y_dot = v_x * jnp.sin(beta + theta)  # d_dot
+        w = v_x * jnp.sin(beta) / l_r
+
+        dx_kin = jnp.concatenate([p_x_dot, p_y_dot, w,
+                                  f_r_x], axis=0)
+        return dx_kin.reshape(-1, 4)
+
+    def ode(self, x: jax.Array, u: jax.Array, params: CarParams):
+        """
+        Using kinematic model with blending: https://arxiv.org/pdf/1905.05150.pdf
+        Code based on: https://github.com/manish-pra/copg/blob/4a370594ab35f000b7b43b1533bd739f70139e4e/car_racing_simulator/VehicleModel.py#L381
+        """
+        assert x.shape == (6,) and u.shape == (2,)
+        # First 3 dimensions of x are states, last 3 are velocities
+        # First dimension of u is steering angle, second is acceleration
+        # Take care of the control input
+        u = jnp.tanh(u)
+        u = u.at[0].set(u[0] * self.system_params.max_steering)
+
+        v_x = jnp.atleast_1d(x[..., 3])
+        blend_ratio = (v_x - 0.3) / (0.2)
+        l = params.l
+        l_r = params._get_x_com()
+
+        lambda_blend = jnp.minimum(
+            jnp.maximum(blend_ratio, jnp.zeros_like(blend_ratio)), jnp.ones_like(blend_ratio)
+        )
+
+        # if lambda_blend < 1:
+        v_x = jnp.atleast_1d(x[..., 3])
+        v_y = jnp.atleast_1d(x[..., 4])
+        x_kin = jnp.concatenate([jnp.atleast_1d(x[..., 0]),
+                                 jnp.atleast_1d(x[..., 1]), jnp.atleast_1d(x[..., 2]), v_x], axis=-1)
+        x_kin = x_kin.reshape(-1, 4)
+        dxkin = self._ode_kin(x_kin, u, params)
+        delta = u[..., 0]
+        beta = l_r * jnp.tan(delta) / l
+        v_x_state = dxkin[..., 3]
+        v_y_state = dxkin[..., 3] * beta
+        w = v_x_state * jnp.tan(delta) / l
+        dx_kin_full = jnp.asarray([dxkin[..., 0], dxkin[..., 1],
+                                   dxkin[..., 2], v_x_state, v_y_state,
+                                   w])
+        dx_kin_full = dx_kin_full.reshape(-1, 6)
+        dxdyn = self._ode_dyn(x=x, u=u, params=params)
+        mul = jax.vmap(lambda x, y: x * y)
+        x_to_return = mul(lambda_blend, jnp.atleast_2d(dxdyn)) + mul(1 - lambda_blend, dx_kin_full).reshape(-1, 6)
+        return x_to_return.reshape(-1)
+
+    def _dynamics(self, x: jnp.ndarray, u: jnp.ndarray, t: jnp.ndarray) -> jnp.ndarray:
+        return self.ode(x, u, self.system_params)
+
+
 def get_simulator_dynamics(simulator: SimulatorType, scaling: Scaling) -> SimulatorDynamics:
     if simulator == SimulatorType.LOTKA_VOLTERRA:
         return LotkaVolterra(**scaling._asdict())
@@ -668,7 +818,8 @@ def get_simulator_dynamics(simulator: SimulatorType, scaling: Scaling) -> Simula
         return QuadrotorEuler(**scaling._asdict())
     elif simulator == SimulatorType.QUADROTOR_2D:
         return Quadrotor2D(**scaling._asdict())
-
+    elif simulator == SimulatorType.RACE_CAR:
+        return RaceCar(**scaling._asdict())
 
 
 if __name__ == "__main__":

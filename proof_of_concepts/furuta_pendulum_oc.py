@@ -1,17 +1,14 @@
 import jax.numpy as jnp
-from jax import random
+from jax.config import config
 
 from cucrl.optimal_cost.optimal_cost import OptimalCost
 from cucrl.simulator.simulator_costs import FurutaPendulum as FurutaPendulumCosts
 from cucrl.simulator.simulator_dynamics import FurutaPendulum
 
-from jax.config import config
 config.update("jax_enable_x64", True)
 
 
 def run_furuta_pendulum():
-    state_dim = 4
-    action_dim = 1
     time_horizon = (0, 10)
     system = FurutaPendulum()
     cost = FurutaPendulumCosts()

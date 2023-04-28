@@ -30,7 +30,7 @@ if __name__ == '__main__':
     seed = 0
     num_matching_points = 50
     num_visualization_points = 1000
-    num_observation_points = 20
+    num_observation_points = 10
 
     my_initial_conditions = [jnp.array([0.0, 0.0, 0.0, 0.0])]
 
@@ -122,7 +122,7 @@ if __name__ == '__main__':
             dynamics_training=OptimizerConfig(type=Optimizer.ADAM, wd=0.1,
                                               learning_rate=LearningRate(type=LearningRateType.PIECEWISE_CONSTANT,
                                                                          kwargs={'boundaries': [10 ** 4],
-                                                                                 'values': [0.01, 0.001]}, )
+                                                                                 'values': [0.1, 0.01]}, )
                                               ),
         ),
         logging=LoggingConfig(track_wandb=track_wandb, track_just_loss=track_just_loss, visualization=visualization),
