@@ -29,7 +29,9 @@ class BestPossibleDiscreteAlgorithm:
 
         self.initial_actions = jnp.zeros(shape=(self.num_action_nodes, self.simulator_dynamics.control_dim))
 
-        self.num_low_steps = 300
+        self.initial_actions = -0.01 * jnp.ones(shape=(self.num_action_nodes, self.simulator_dynamics.control_dim))
+
+        self.num_low_steps = 50
         self.time_span = self.dt
 
         self.ilqr = ILQR(self.cost_fn, self.dynamics_fn)
@@ -77,6 +79,10 @@ class BestPossibleDiscreteAlgorithm:
         xs_all = xs_all.reshape(-1, self.simulator_dynamics.state_dim)
         us_all = us_all.reshape(-1, self.simulator_dynamics.control_dim)
         xs_all = jnp.concatenate([initial_state[None, :], xs_all])
+
+        self.best_xs_all = xs_all
+        self.best_us_all = us_all
+        self.ts_all = jnp.linspace(self.time_horizon[0], self.time_horizon[1], xs_all.shape[0])
 
         true_cost = self.cost_fn_eval(xs_all, us_all)
         return true_cost
@@ -127,21 +133,35 @@ class BestPossibleDiscreteAlgorithm:
 
 if __name__ == "__main__":
     from jax.config import config
+    import matplotlib.pyplot as plt
+    from cucrl.simulator.simulator_costs import RaceCar as RaceCarCost
+    from cucrl.simulator.simulator_dynamics import RaceCar as RaceCarDynamics
 
     config.update("jax_enable_x64", True)
-    from cucrl.simulator.simulator_dynamics import Pendulum as PendulumDynamics
-    from cucrl.simulator.simulator_costs import Pendulum as PendulumCosts
 
-    state_scaling = jnp.diag(jnp.array([1.0, 2.0]))
-    control_scaling = jnp.eye(1)
-    time_scaling = jnp.ones(shape=(1,))
+    # # Pendulum
+    # state_scaling = jnp.diag(jnp.array([1.0, 2.0]))
+    # simulator_dynamics = PendulumDynamics(state_scaling=state_scaling)
+    # simulator_costs = PendulumCosts(state_scaling=state_scaling)
+    # best_possible_algorithm = BestPossibleDiscreteAlgorithm(simulator_dynamics, simulator_costs, time_horizon=(0, 10),
+    #                                                         num_nodes=11)
+    # print(best_possible_algorithm.get_optimal_cost(jnp.array([jnp.pi / 2, 0.0])))
+    #
+    # plt.plot(best_possible_algorithm.ts_all, best_possible_algorithm.best_xs_all)
+    # plt.show()
+    # plt.plot(best_possible_algorithm.ts_all[:-1], best_possible_algorithm.best_us_all)
+    # plt.show()
 
-    simulator_dynamics = PendulumDynamics(state_scaling=state_scaling, control_scaling=control_scaling,
-                                          time_scaling=time_scaling)
-    simulator_costs = PendulumCosts(state_scaling=state_scaling, control_scaling=control_scaling,
-                                    time_scaling=time_scaling)
-
+    # Race Car
+    state_scaling = jnp.diag(jnp.array([1.0, 1.0, 1.0, 1.0, 10.0, 1.0]))
+    simulator_dynamics = RaceCarDynamics(state_scaling=state_scaling)
+    simulator_costs = RaceCarCost(state_scaling=state_scaling)
     best_possible_algorithm = BestPossibleDiscreteAlgorithm(simulator_dynamics, simulator_costs, time_horizon=(0, 10),
-                                                            num_nodes=11)
+                                                            num_nodes=50)
+    print("Best discrete cost: ",
+          best_possible_algorithm.get_optimal_cost(jnp.array([0, 0, 0, 0, 0, 0], dtype=jnp.float64)))
 
-    print(best_possible_algorithm.get_optimal_cost(jnp.array([jnp.pi / 2, 0.0])))
+    plt.plot(best_possible_algorithm.ts_all, best_possible_algorithm.best_xs_all)
+    plt.show()
+    plt.plot(best_possible_algorithm.ts_all[:-1], jnp.tanh(best_possible_algorithm.best_us_all))
+    plt.show()

@@ -240,7 +240,7 @@ class RaceCar(SimulatorCostsAndConstraints):
     def _running_cost(self, x, u):
         u = jnp.tanh(u)
         u = u.at[0].set(u[0] * self.system_params.max_steering)
-        return 10 * jnp.sum(u ** 2) + jnp.sum((x[:2] - self.state_target[:2]) ** 2)
+        return 0 * jnp.sum(u ** 2) + jnp.sum((x[:2] - self.state_target[:2]) ** 2)
 
     def _terminal_cost(self, x, u):
         return jnp.zeros(shape=())
