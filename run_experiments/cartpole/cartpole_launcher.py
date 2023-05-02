@@ -2,7 +2,7 @@ import cartpole_exp
 from cucrl.utils.representatives import BatchStrategy
 from run_experiments.util import generate_base_command, generate_run_commands
 
-PROJECT_NAME = "Cartpole_first_experiment"
+PROJECT_NAME = "Cartpole_only_one_angle"
 
 applicable_configs = {
     'MSS': [BatchStrategy.MAX_KERNEL_DISTANCE_GREEDY, BatchStrategy.MAX_DETERMINANT_GREEDY, BatchStrategy.EQUIDISTANT],
