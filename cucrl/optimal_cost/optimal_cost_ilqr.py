@@ -46,7 +46,7 @@ class OptimalCost:
         initial_actions = 0.01 * jnp.ones(shape=(self.num_nodes, self.simulator_dynamics.control_dim,))
         out = self.ilqr.solve(None, None, initial_conditions, initial_actions, self.ilqr_params)
         self.results = out
-        return out.obj
+        return out
 
 
 if __name__ == "__main__":
