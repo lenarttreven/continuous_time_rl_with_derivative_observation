@@ -179,6 +179,53 @@ class Quadrotor2D(SimulatorCostsAndConstraints):
                               u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 
 
+class Glucose(SimulatorCostsAndConstraints):
+    """
+    Dynamics of pendulum
+    """
+
+    def __init__(self, system_params=None, time_scaling=None, state_scaling=None,
+                 control_scaling=None):
+        super().__init__(state_dim=2, control_dim=1, system_params=system_params, time_scaling=time_scaling,
+                         state_scaling=state_scaling, control_scaling=control_scaling)
+        self.state_target = jnp.zeros(shape=(self.state_dim,), dtype=jnp.float64)
+        self.action_target = jnp.zeros(shape=(self.control_dim,), dtype=jnp.float64)
+        self.running_q = jnp.eye(self.state_dim)
+        self.running_r = jnp.eye(self.control_dim)
+        self.terminal_q = jnp.eye(self.state_dim)
+        self.terminal_r = jnp.eye(self.control_dim)
+
+        self.tracking_q = jnp.eye(self.state_dim)
+        self.tracking_r = jnp.eye(self.control_dim)
+        self.tracking_q_T = jnp.eye(self.state_dim)
+        self.tracking_r_T = jnp.zeros(self.control_dim)
+
+        self.a = 1.0
+        self.b = 1.0
+        self.c = 1.0
+        self.A = 2.0
+        self.l = 0.5
+        self.T = 0.2
+        self.x0 = jnp.array([.75, 0.])
+
+    def _running_cost(self, x, u):
+        return 100 * (self.A * (x[0] - self.l) ** 2 + u[0] ** 2)
+
+    def _terminal_cost(self, x, u):
+        return 0.0
+
+    def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return jnp.array([0.0])
+
+    def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
+
+    def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
+
+
 class MountainCar(SimulatorCostsAndConstraints):
     """
     Dynamics of pendulum

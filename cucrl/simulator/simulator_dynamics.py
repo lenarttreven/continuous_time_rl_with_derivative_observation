@@ -200,6 +200,30 @@ class VanDerPolOscilator(SimulatorDynamics):
         return jnp.array([x0_dot, x1_dot])
 
 
+class Glucose(SimulatorDynamics):
+    def __init__(self, time_scaling=None, state_scaling=None,
+                 control_scaling=None):
+        super(Glucose, self).__init__(state_dim=2, control_dim=1, system_params=None,
+                                      time_scaling=time_scaling, state_scaling=state_scaling,
+                                      control_scaling=control_scaling)
+
+        self.a = 1.0
+        self.b = 1.0
+        self.c = 1.0
+        self.A = 2.0
+        self.l = 0.5
+        self.T = 0.2
+        self.x0 = jnp.array([.75, 0.])
+
+    def _dynamics(self, x, u, t):
+        d_x = jnp.array([
+            -self.a * x[0] - self.b * x[1],
+            -self.c * x[1] + u[0]
+        ])
+
+        return d_x
+
+
 class MountainCar(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None,
                  control_scaling=None):
