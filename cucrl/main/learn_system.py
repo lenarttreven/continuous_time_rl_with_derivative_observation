@@ -24,7 +24,7 @@ from cucrl.main.handlers import Keys, DataRepr, VisualisationData
 from cucrl.objectives.objectives import Objectives
 from cucrl.offline_planner.offline_planner import get_offline_planner
 from cucrl.optimal_cost.best_possible_discrete_time import BestPossibleDiscreteAlgorithm
-from cucrl.optimal_cost.optimal_cost_ilqr import OptimalCost
+from cucrl.optimal_cost.dynamics_wrapper import TrueDynamicsWrapper
 from cucrl.plotter.plotter import Plotter
 from cucrl.schedules.learning_rate import get_learning_rate
 from cucrl.simulator.simulator_costs import get_simulator_costs
@@ -98,10 +98,6 @@ class LearnSystem:
         # Prepare beta exploration
         self.beta_exploration = BetaExploration(delta=0.1, state_dim=self.state_dim, rkhs_bound=1,
                                                 type=self.config.interaction.policy.offline_planning.beta_exploration)
-        optimal_cost = OptimalCost(simulator_dynamics=self.data_generator.simulator.simulator_dynamics,
-                                   simulator_costs=self.simulator_costs,
-                                   time_horizon=self.config.data_generation.time_horizon)
-        self.optimal_cost = [optimal_cost.solve(ic) for ic in self.data_generator.initial_conditions]
 
         best_possible_discrete = BestPossibleDiscreteAlgorithm(
             simulator_dynamics=self.data_generator.simulator.simulator_dynamics,
@@ -111,6 +107,7 @@ class LearnSystem:
         self.best_possible_discrete_cost = [best_possible_discrete.get_optimal_cost(ic) for ic in
                                             self.data_generator.initial_conditions]
 
+        self.optimal_cost = self.compute_optimal_cost(self.interaction, self.data_generator.initial_conditions)
         self.dynamics_model = None
 
     def _prepare_dimensions(self, data_generation: DataGenerationConfig):
@@ -136,6 +133,43 @@ class LearnSystem:
                                      self.normalizer,
                                      self.angle_layer, control_options, self.offline_planner,
                                      self.config.data_generation.scaling)
+
+    def compute_optimal_cost(self, control_options, initial_condition):
+        offline_planer_config = self.interaction.policy.offline_planning
+        planner_class = get_offline_planner(offline_planer_config.exploration_strategy)
+        true_dynamics_wrapper = TrueDynamicsWrapper(
+            simulator_dynamics=self.data_generator.simulator.simulator_dynamics, simulator_costs=self.simulator_costs,
+            measurement_collection_config=self.config.interaction.measurement_collector)
+        offline_planner = planner_class(
+            state_dim=self.state_dim, control_dim=self.control_dim, num_nodes=offline_planer_config.num_nodes,
+            numerical_method=offline_planer_config.numerical_method, time_horizon=self.time_horizon,
+            dynamics=true_dynamics_wrapper, simulator_costs=self.simulator_costs,
+            exploration_strategy=offline_planer_config.exploration_strategy,
+            exploration_norm=offline_planer_config.exploration_norm)
+
+        true_policy = get_interactor(self.state_dim, self.control_dim, true_dynamics_wrapper, initial_condition,
+                                     self.normalizer,
+                                     self.angle_layer, control_options, offline_planner,
+                                     self.config.data_generation.scaling)
+
+        true_data_gen = DataGenerator(data_generation=self.config.data_generation, interactor=true_policy)
+
+        dynamics_model = DynamicsModel(params=self.parameters['dynamics'], model_stats=self.stats['dynamics'],
+                                       data_stats=self.data_stats, episode=1,
+                                       beta=self.beta_exploration(num_episodes=1),
+                                       history=DynamicsData(
+                                           ts=jnp.ones(shape=(1, 1)),
+                                           xs=jnp.ones(shape=(1, self.state_dim)),
+                                           us=jnp.ones(shape=(1, self.control_dim)),
+                                           xs_dot_std=jnp.ones(shape=(1, self.state_dim)),
+                                           xs_dot=jnp.ones(shape=(1, self.state_dim))),
+                                       calibration_alpha=jnp.ones(shape=(self.state_dim,)))
+        key = jax.random.PRNGKey(0)
+        true_data_gen.simulator.interactor.update(dynamics_model=dynamics_model, key=key)
+        trajs = true_data_gen.generate_trajectories(key)
+        costs = vmap(self.compute_cost)(trajs[0].visualization_data.ts, trajs[0].visualization_data.xs,
+                                        trajs[0].visualization_data.us)
+        return costs
 
     def _initialize_parameters(self):
         time_parameters = time.time()
