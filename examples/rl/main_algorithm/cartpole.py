@@ -3,9 +3,9 @@ import os
 
 import jax.numpy as jnp
 import jax.random
-import wandb
 from jax.config import config
 
+import wandb
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
@@ -104,7 +104,7 @@ if __name__ == '__main__':
                 ),
                 initial_control=initial_control,
             ),
-            angles_dim=[0, 2],
+            angles_dim=[0, ],
             measurement_collector=MeasurementCollectionConfig(
                 batch_size_per_time_horizon=num_observation_points,
                 batch_strategy=BatchStrategy.MAX_DETERMINANT_GREEDY,

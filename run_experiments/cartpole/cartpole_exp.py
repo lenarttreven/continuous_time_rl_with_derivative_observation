@@ -96,7 +96,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
                 ),
                 initial_control=initial_control,
             ),
-            angles_dim=[0, 2],
+            angles_dim=[0,],
             measurement_collector=MeasurementCollectionConfig(
                 batch_size_per_time_horizon=num_observation_points,
                 batch_strategy=measurement_selection_strategy,
