@@ -1,4 +1,4 @@
-import furuta_penduum_exp
+import furuta_pendulum_exp
 from cucrl.utils.representatives import BatchStrategy
 from run_experiments.util import generate_base_command, generate_run_commands
 
@@ -20,7 +20,7 @@ def main():
                 'project_name': PROJECT_NAME
             }
 
-            cmd = generate_base_command(furuta_penduum_exp, flags=flags)
+            cmd = generate_base_command(furuta_pendulum_exp, flags=flags)
             command_list.append(cmd)
 
     # submit jobs
