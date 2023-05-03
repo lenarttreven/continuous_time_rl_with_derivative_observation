@@ -145,7 +145,8 @@ class LearnSystem:
             numerical_method=offline_planer_config.numerical_method, time_horizon=self.time_horizon,
             dynamics=true_dynamics_wrapper, simulator_costs=self.simulator_costs,
             exploration_strategy=offline_planer_config.exploration_strategy,
-            exploration_norm=offline_planer_config.exploration_norm)
+            exploration_norm=offline_planer_config.exploration_norm,
+            minimize_method=offline_planer_config.minimization_method, )
 
         true_policy = get_interactor(self.state_dim, self.control_dim, true_dynamics_wrapper, initial_condition,
                                      self.normalizer,
@@ -217,7 +218,8 @@ class LearnSystem:
             numerical_method=offline_planer_config.numerical_method, time_horizon=self.time_horizon,
             dynamics=self.dynamics, simulator_costs=self.simulator_costs,
             exploration_strategy=offline_planer_config.exploration_strategy,
-            exploration_norm=offline_planer_config.exploration_norm)
+            exploration_norm=offline_planer_config.exploration_norm,
+            minimize_method=offline_planer_config.minimization_method)
 
     def _prepare_optimizer(self, optimizer: OptimizersConfig):
         # Prepare learning rate

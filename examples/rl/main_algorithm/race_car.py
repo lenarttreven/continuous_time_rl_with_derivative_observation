@@ -16,7 +16,7 @@ from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.helper_functions import namedtuple_to_dict
 from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, BNNTypes
 from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, BetaType
-from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
+from cucrl.utils.representatives import TimeHorizonType, BatchStrategy, MinimizationMethod
 
 config.update("jax_enable_x64", True)
 
@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     my_initial_conditions = [jnp.array([0, 0, 0, 0, 0, 0], dtype=jnp.float64)]
 
-    time_horizon = (0, 10)
+    time_horizon = (0, 20)
 
     beta = 1
     state_dim = 6
@@ -91,15 +91,16 @@ if __name__ == '__main__':
             policy=PolicyConfig(
                 online_tracking=OnlineTrackingConfig(
                     mpc_dt=0.02,
-                    time_horizon=3.0,
-                    num_nodes=300,
+                    time_horizon=5.0,
+                    num_nodes=500,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(
                     num_independent_runs=4,
                     exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA_TIME,
                     num_nodes=1000,
-                    beta_exploration=BetaType.GP
+                    beta_exploration=BetaType.GP,
+                    minimization_method=MinimizationMethod.ILQR,
                 ),
                 initial_control=initial_control,
             ),

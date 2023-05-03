@@ -188,7 +188,7 @@ class Glucose(SimulatorCostsAndConstraints):
                  control_scaling=None):
         super().__init__(state_dim=2, control_dim=1, system_params=system_params, time_scaling=time_scaling,
                          state_scaling=state_scaling, control_scaling=control_scaling)
-        self.state_target = jnp.zeros(shape=(self.state_dim,), dtype=jnp.float64)
+        self.state_target = jnp.array([0.47773321, 0.33197129], dtype=jnp.float64)
         self.action_target = jnp.zeros(shape=(self.control_dim,), dtype=jnp.float64)
         self.running_q = jnp.eye(self.state_dim)
         self.running_r = jnp.eye(self.control_dim)
@@ -235,7 +235,7 @@ class CancerTreatment(SimulatorCostsAndConstraints):
                  control_scaling=None):
         super().__init__(state_dim=1, control_dim=1, system_params=system_params, time_scaling=time_scaling,
                          state_scaling=state_scaling, control_scaling=control_scaling)
-        self.state_target = jnp.zeros(shape=(self.state_dim,), dtype=jnp.float64)
+        self.state_target = jnp.array([0.54251185], dtype=jnp.float64)
         self.action_target = jnp.zeros(shape=(self.control_dim,), dtype=jnp.float64)
         self.running_q = jnp.eye(self.state_dim)
         self.running_r = jnp.eye(self.control_dim)
@@ -321,6 +321,10 @@ class RaceCar(SimulatorCostsAndConstraints):
         super().__init__(state_dim=6, control_dim=2, system_params=system_params, time_scaling=time_scaling,
                          state_scaling=state_scaling, control_scaling=control_scaling)
         self.state_target = jnp.array([5, -2, 0, 0, 0, 0], dtype=jnp.float64)
+
+        self.final_tracking_state = jnp.array([5.16399081e+00, -2.06869377e+00, -4.02571791e-01, 1.35987639e-01,
+                                               -2.20793977e-04, -7.56103134e-04], dtype=jnp.float64)
+
         self.action_target = jnp.array([0, 0], dtype=jnp.float64)
         self.running_q = jnp.eye(self.state_dim)
         self.running_r = jnp.eye(self.control_dim)
@@ -335,25 +339,22 @@ class RaceCar(SimulatorCostsAndConstraints):
     def _running_cost(self, x, u):
         u = jnp.tanh(u)
         u = u.at[0].set(u[0] * self.system_params.max_steering)
-        return 0 * jnp.sum(u ** 2) + jnp.sum((x[:2] - self.state_target[:2]) ** 2)
+        return 100 * jnp.sum(u ** 2) + jnp.sum((x[:2] - self.state_target[:2]) ** 2)
 
     def _terminal_cost(self, x, u):
-        return jnp.zeros(shape=())
-        # u = jnp.tanh(u)
-        # u = u.at[0].set(u[0] * self.system_params.max_steering)
-        # return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.terminal_q,
-        #                       r=self.terminal_r)
+        # return jnp.zeros(shape=())
+        u = jnp.tanh(u)
+        u = u.at[0].set(u[0] * self.system_params.max_steering)
+        return jnp.sum(u ** 2) + jnp.sum((x[:2] - self.state_target[:2]) ** 2)
 
     def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
         return jnp.array([0.0])
 
     def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
-        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
-                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
+        return jnp.sum(u ** 2) + jnp.sum(x[:2] ** 2)
 
     def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
-        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
-                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
+        return jnp.sum(u ** 2) + jnp.sum(x[:2] ** 2)
 
 
 class Bicycle(SimulatorCostsAndConstraints):
@@ -644,6 +645,57 @@ class QuadrotorEuler(SimulatorCostsAndConstraints):
                               u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 
 
+class HIVTreatment(SimulatorCostsAndConstraints):
+    """
+    Dynamics of pendulum
+    """
+
+    def __init__(self, system_params=None, time_scaling=None, state_scaling=None,
+                 control_scaling=None):
+        super().__init__(state_dim=3, control_dim=1, system_params=system_params, time_scaling=time_scaling,
+                         state_scaling=state_scaling, control_scaling=control_scaling)
+        self.s = 10.
+        self.m_1 = .02
+        self.m_2 = .5
+        self.m_3 = 4.4
+        self.r = .03,
+        self.T_max = 1500.
+        self.k = .000024
+        self.N = 300.
+        self.x_0 = (800., .04, 1.5)
+        self.A = .05
+        self.T = 20.
+
+        self.state_target = jnp.array([0.54251185], dtype=jnp.float64)
+        self.action_target = jnp.zeros(shape=(self.control_dim,), dtype=jnp.float64)
+        self.running_q = jnp.eye(self.state_dim)
+        self.running_r = jnp.eye(self.control_dim)
+        self.terminal_q = jnp.eye(self.state_dim)
+        self.terminal_r = jnp.eye(self.control_dim)
+
+        self.tracking_q = jnp.eye(self.state_dim)
+        self.tracking_r = jnp.eye(self.control_dim)
+        self.tracking_q_T = jnp.eye(self.state_dim)
+        self.tracking_r_T = jnp.zeros(self.control_dim)
+
+    def _running_cost(self, x, u):
+        return -self.A * x[0] ** 2 + (1 - u[0]) ** 2
+
+    def _terminal_cost(self, x, u):
+        return 0.0
+
+    def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return jnp.array([0.0])
+
+    def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
+
+    def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
+
+
 def get_simulator_costs(simulator: SimulatorType, scaling: Scaling) -> SimulatorCostsAndConstraints:
     if simulator == SimulatorType.PENDULUM:
         return Pendulum(**scaling._asdict())
@@ -671,3 +723,5 @@ def get_simulator_costs(simulator: SimulatorType, scaling: Scaling) -> Simulator
         return RaceCar(**scaling._asdict())
     elif simulator == SimulatorType.CANCER_TREATMENT:
         return CancerTreatment(**scaling._asdict())
+    elif simulator == SimulatorType.GLUCOSE:
+        return Glucose(**scaling._asdict())

@@ -3,22 +3,22 @@ import matplotlib.pyplot as plt
 from jax.config import config
 
 from cucrl.optimal_cost.optimal_cost_ilqr import OptimalCost
-from cucrl.simulator.simulator_costs import Glucose as GlucoseCosts
-from cucrl.simulator.simulator_dynamics import Glucose
+from cucrl.simulator.simulator_costs import HIVTreatment as HIVTreatmentCosts
+from cucrl.simulator.simulator_dynamics import HIVTreatment
 
 config.update("jax_enable_x64", True)
 
 
-def run_cartpole():
-    time_horizon = (0, 0.45)
+def run():
+    time_horizon = (0, 20.0)
 
     time_scaling = jnp.ones(shape=(1,))
-    state_scaling = jnp.diag(jnp.array([1., 5 * 1e2]))
-    control_scaling = 50 * jnp.eye(1)
+    state_scaling = jnp.diag(jnp.array([1., 1e2, 1e2]))
+    control_scaling = jnp.eye(1)
 
-    system = Glucose(time_scaling=time_scaling, state_scaling=state_scaling, control_scaling=control_scaling)
-    cost = GlucoseCosts(time_scaling=time_scaling, state_scaling=state_scaling, control_scaling=control_scaling)
-    initial_state = jnp.array([.75, 0.])
+    system = HIVTreatment(time_scaling=time_scaling, state_scaling=state_scaling, control_scaling=control_scaling)
+    cost = HIVTreatmentCosts(time_scaling=time_scaling, state_scaling=state_scaling, control_scaling=control_scaling)
+    initial_state = jnp.array([800., .04, 1.5])
     num_nodes = 200
     optimizer = OptimalCost(simulator_dynamics=system, simulator_costs=cost, num_nodes=num_nodes,
                             time_horizon=time_horizon)
@@ -37,4 +37,4 @@ def run_cartpole():
 
 
 if __name__ == '__main__':
-    out = run_cartpole()
+    out = run()

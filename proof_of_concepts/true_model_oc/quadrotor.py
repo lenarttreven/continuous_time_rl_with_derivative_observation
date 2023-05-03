@@ -1,23 +1,24 @@
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 from jax.config import config
+import matplotlib.pyplot as plt
 
 from cucrl.optimal_cost.optimal_cost_ilqr import OptimalCost
-from cucrl.simulator.simulator_costs import CancerTreatment as CancerTreatmentCosts
-from cucrl.simulator.simulator_dynamics import CancerTreatment
+from cucrl.simulator.simulator_costs import QuadrotorEuler as QuadrotorEulerCosts
+from cucrl.simulator.simulator_dynamics import QuadrotorEuler
 
 config.update("jax_enable_x64", True)
 
 
 def run():
-    time_scaling = jnp.ones(shape=(1,))
-    state_scaling = jnp.diag(jnp.array([1.]))
-    control_scaling = jnp.eye(1)
+    time_horizon = (0, 15)
+    state_scaling = jnp.diag(jnp.array([1, 1, 1, 1, 1, 1, 10, 10, 1, 10, 10, 1], dtype=jnp.float64))
 
-    system = CancerTreatment(time_scaling=time_scaling, state_scaling=state_scaling, control_scaling=control_scaling)
-    cost = CancerTreatmentCosts(time_scaling=time_scaling, state_scaling=state_scaling, control_scaling=control_scaling)
-    time_horizon = (0, system.T)
-    initial_state = system.x0
+    system = QuadrotorEuler(state_scaling=state_scaling)
+    cost = QuadrotorEulerCosts(state_scaling=state_scaling)
+    initial_state = jnp.array([1.0, 1.0, 1.0,
+                               0., 0., 0.,
+                               0.0, 0.0, 0.0,
+                               0.0, 0.0, 0.0], dtype=jnp.float64)
     num_nodes = 100
     optimizer = OptimalCost(simulator_dynamics=system, simulator_costs=cost, num_nodes=num_nodes,
                             time_horizon=time_horizon)
@@ -31,8 +32,8 @@ def run():
     plt.plot(ts[:-1], us, label='us')
     plt.legend()
     plt.show()
-    print('Optimal cost: ', out.obj)
     return out
+
 
 if __name__ == '__main__':
     out = run()

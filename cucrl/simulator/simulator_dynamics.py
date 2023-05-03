@@ -836,6 +836,35 @@ class CancerTreatment(SimulatorDynamics):
         return jnp.array(d_x).reshape(self.state_dim, )
 
 
+class HIVTreatment(SimulatorDynamics):
+    def __init__(self, time_scaling=None, state_scaling=None,
+                 control_scaling=None):
+        super(HIVTreatment, self).__init__(state_dim=3, control_dim=1, system_params=None,
+                                           time_scaling=time_scaling, state_scaling=state_scaling,
+                                           control_scaling=control_scaling)
+
+        self.s = 10.
+        self.m_1 = .02
+        self.m_2 = .5
+        self.m_3 = 4.4
+        self.r = .03
+        self.T_max = 1500.
+        self.k = .000024
+        self.N = 300.
+        self.x_0 = (800., .04, 1.5)
+        self.A = .05
+        self.T = 20.
+
+    def _dynamics(self, x, u, t):
+        d_x = jnp.array([
+            self.s / (1 + x[2]) - self.m_1 * x[0] + self.r * x[0] * (
+                    1 - (x[0] + x[1]) / self.T_max) - u[0] * self.k * x[0] * x[2],
+            u[0] * self.k * x[0] * x[2] - self.m_2 * x[1],
+            self.N * self.m_2 * x[1] - self.m_3 * x[2],
+        ])
+        return d_x
+
+
 def get_simulator_dynamics(simulator: SimulatorType, scaling: Scaling) -> SimulatorDynamics:
     if simulator == SimulatorType.LOTKA_VOLTERRA:
         return LotkaVolterra(**scaling._asdict())
@@ -867,6 +896,8 @@ def get_simulator_dynamics(simulator: SimulatorType, scaling: Scaling) -> Simula
         return RaceCar(**scaling._asdict())
     elif simulator == SimulatorType.CANCER_TREATMENT:
         return CancerTreatment(**scaling._asdict())
+    elif simulator == SimulatorType.GLUCOSE:
+        return Glucose(**scaling._asdict())
 
 
 if __name__ == "__main__":

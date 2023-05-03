@@ -69,6 +69,13 @@ class SimulatorType(Enum):
     QUADROTOR_2D = auto()
     RACE_CAR = auto()
     CANCER_TREATMENT = auto()
+    GLUCOSE = auto()
+
+
+class MinimizationMethod(Enum):
+    IPOPT = auto()
+    ILQR = auto()
+    ILQR_WITH_CEM = auto()
 
 
 class Statistics(Enum):

@@ -3,19 +3,20 @@ from typing import Tuple
 import jax
 import jax.numpy as jnp
 from jax.lax import cond
-from trajax.optimizers import ILQRHyperparams, CEMHyperparams, ILQR_with_CEM_warmstart
+from trajax.optimizers import ILQRHyperparams, CEMHyperparams, ILQR_with_CEM_warmstart, ILQR
 
 from cucrl.dynamics_with_control.dynamics_models import AbstractDynamics
 from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanner
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
 from cucrl.utils.classes import OCSolution, OfflinePlanningParams, DynamicsModel, DynamicsIdentifier
-from cucrl.utils.representatives import ExplorationStrategy, NumericalComputation, Norm
+from cucrl.utils.representatives import ExplorationStrategy, NumericalComputation, Norm, MinimizationMethod
 
 
 class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
     def __init__(self, state_dim: int, control_dim: int, num_nodes: int, time_horizon: Tuple[float, float],
                  dynamics: AbstractDynamics, simulator_costs: SimulatorCostsAndConstraints,
-                 numerical_method=NumericalComputation.LGL, minimize_method='IPOPT',
+                 numerical_method=NumericalComputation.LGL,
+                 minimize_method: MinimizationMethod = MinimizationMethod.ILQR_WITH_CEM,
                  exploration_norm: Norm = Norm.L_INF, exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA_TIME):
         super().__init__(state_dim=state_dim, control_dim=control_dim, num_nodes=num_nodes, time_horizon=time_horizon,
                          dynamics=dynamics, simulator_costs=simulator_costs, numerical_method=numerical_method,
@@ -27,13 +28,18 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
         self.num_total_params = self.state_dim * self.num_control_nodes + self.control_dim * self.num_control_nodes
         self.exploration_norm = exploration_norm
 
-        self.cem_params = CEMHyperparams(max_iter=10, sampling_smoothing=0.0, num_samples=200, evolution_smoothing=0.0,
-                                         elite_portion=0.1)
-        self.ilqr_params = ILQRHyperparams(maxiter=100)
-        self.optimizer = ILQR_with_CEM_warmstart(self.cost_fn, self.dynamics_fn)
+        if self.minimize_method == MinimizationMethod.ILQR_WITH_CEM:
+            self.cem_params = CEMHyperparams(max_iter=10, sampling_smoothing=0.0, num_samples=200,
+                                             evolution_smoothing=0.0,
+                                             elite_portion=0.1)
+            self.ilqr_params = ILQRHyperparams(maxiter=100)
+            self.control_low = -10.0 * jnp.ones(shape=(self.control_dim + self.state_dim,))
+            self.control_high = 10.0 * jnp.ones(shape=(self.control_dim + self.state_dim,))
+            self.optimizer = ILQR_with_CEM_warmstart(self.cost_fn, self.dynamics_fn)
 
-        self.control_low = -10.0 * jnp.ones(shape=(self.control_dim + self.state_dim,))
-        self.control_high = 10.0 * jnp.ones(shape=(self.control_dim + self.state_dim,))
+        elif self.minimize_method == MinimizationMethod.ILQR:
+            self.ilqr_params = ILQRHyperparams(maxiter=100)
+            self.optimizer = ILQR(self.cost_fn, self.dynamics_fn)
 
     def ode(self, x: jax.Array, u: jax.Array, eta: jax.Array, dynamics_model: DynamicsModel):
         assert x.shape == eta.shape == (self.state_dim,) and u.shape == (self.control_dim,)
@@ -58,9 +64,12 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
     def plan_offline(self, dynamics_model: DynamicsModel, initial_parameters: OfflinePlanningParams,
                      x0: jax.Array) -> OCSolution:
         initial_actions = jnp.zeros(shape=(self.num_control_nodes, self.control_dim + self.state_dim))
-        out = self.optimizer.solve(None, dynamics_model, x0, initial_actions, control_low=self.control_low,
-                                   control_high=self.control_high, ilqr_hyperparams=self.ilqr_params,
-                                   cem_hyperparams=self.cem_params, random_key=initial_parameters.key)
+        if self.minimize_method == MinimizationMethod.ILQR_WITH_CEM:
+            out = self.optimizer.solve(None, dynamics_model, x0, initial_actions, control_low=self.control_low,
+                                       control_high=self.control_high, ilqr_hyperparams=self.ilqr_params,
+                                       cem_hyperparams=self.cem_params, random_key=initial_parameters.key)
+        elif self.minimize_method == MinimizationMethod.ILQR:
+            out = self.optimizer.solve(None, dynamics_model, x0, initial_actions, self.ilqr_params)
         us = out.us[:, :self.control_dim]
         us = jnp.concatenate([us, us[-1][None, :]])
         eps = out.us[:, self.control_dim:]

@@ -7,7 +7,7 @@ from cucrl.schedules.betas import BetasType
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.representatives import BetaType, BNNTypes, BatchStrategy
 from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, NumericalComputation, TimeHorizonType
-from cucrl.utils.representatives import SmootherType, ExplorationStrategy, Norm, DynamicsTracking
+from cucrl.utils.representatives import SmootherType, ExplorationStrategy, Norm, DynamicsTracking, MinimizationMethod
 
 
 class Scaling(NamedTuple):
@@ -72,6 +72,7 @@ class OfflinePlanningConfig(NamedTuple):
     numerical_method: NumericalComputation = NumericalComputation.SPLINES
     beta_exploration: BetaType = BetaType.GP
     num_nodes: int = 30
+    minimization_method: MinimizationMethod = MinimizationMethod.ILQR_WITH_CEM
 
 
 class OnlineTrackingConfig(NamedTuple):
