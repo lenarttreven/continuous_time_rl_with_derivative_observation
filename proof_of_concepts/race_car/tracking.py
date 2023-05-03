@@ -58,7 +58,7 @@ if __name__ == '__main__':
     plt.show()
 
     for i in range(u_dim):
-        plt.plot(ts[:-1], jnp.tanh(out.us[:, i]), label=r'u_{}'.format(i))
+        plt.plot(ts[:-1], out.us[:, i], label=r'u_{}'.format(i))
     plt.legend()
     plt.show()
 

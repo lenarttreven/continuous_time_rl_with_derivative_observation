@@ -6,7 +6,7 @@ import jax.random
 from jax.config import config
 
 import wandb
-from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig, SystemAssumptions
+from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
 from cucrl.main.config import RunConfig, DataGenerationConfig, DynamicsConfig, InteractionConfig
@@ -15,7 +15,7 @@ from cucrl.schedules.betas import BetasType
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.helper_functions import namedtuple_to_dict
 from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, BNNTypes
-from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, NumericalComputation, Norm, BetaType
+from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, Norm, BetaType
 from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 
 config.update("jax_enable_x64", True)
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     num_matching_points = 50
     num_visualization_points = 1000
 
-    initial_conditions = [jnp.array([jnp.pi / 2, 0])]
+    initial_conditions = [jnp.array([jnp.pi, 0])]
     time_horizon = (0, 10)
     noise_scalar = 0.01
     stds_for_simulation = jnp.array([noise_scalar, noise_scalar], dtype=jnp.float64)
@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
 
     def initial_control(x, t):
-        return jnp.sin(t).reshape(1, )
+        return 0.1 * jnp.sin(t).reshape(1, )
 
 
     run_config = RunConfig(
@@ -94,21 +94,14 @@ if __name__ == '__main__':
                 ),
                 offline_planning=OfflinePlanningConfig(
                     num_independent_runs=4,
-                    exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA_TIME,
+                    exploration_strategy=ExplorationStrategy.MEAN,
                     exploration_norm=Norm.L_INF,
-                    numerical_method=NumericalComputation.LGL,
                     num_nodes=100,
                     beta_exploration=BetaType.GP
                 ),
                 initial_control=initial_control,
             ),
             angles_dim=[0, ],
-            system_assumptions=SystemAssumptions(
-                l_f=jnp.array(1.0, dtype=jnp.float64),
-                l_pi=jnp.array(1.0, dtype=jnp.float64),
-                l_sigma=jnp.array(1.0, dtype=jnp.float64),
-                hallucination_error=jnp.array(10.0, dtype=jnp.float64)
-            ),
             measurement_collector=MeasurementCollectionConfig(
                 batch_size_per_time_horizon=10,
                 batch_strategy=BatchStrategy.MAX_DETERMINANT_GREEDY,
