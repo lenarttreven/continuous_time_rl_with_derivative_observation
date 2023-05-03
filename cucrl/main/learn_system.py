@@ -169,6 +169,7 @@ class LearnSystem:
         trajs = true_data_gen.generate_trajectories(key)
         costs = vmap(self.compute_cost)(trajs[0].visualization_data.ts, trajs[0].visualization_data.xs,
                                         trajs[0].visualization_data.us)
+        print("Optimal costs: ", costs)
         return costs
 
     def _initialize_parameters(self):

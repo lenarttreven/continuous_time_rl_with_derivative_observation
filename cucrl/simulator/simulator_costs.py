@@ -226,6 +226,54 @@ class Glucose(SimulatorCostsAndConstraints):
                               u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 
 
+class CancerTreatment(SimulatorCostsAndConstraints):
+    """
+    Dynamics of pendulum
+    """
+
+    def __init__(self, system_params=None, time_scaling=None, state_scaling=None,
+                 control_scaling=None):
+        super().__init__(state_dim=1, control_dim=1, system_params=system_params, time_scaling=time_scaling,
+                         state_scaling=state_scaling, control_scaling=control_scaling)
+        self.state_target = jnp.zeros(shape=(self.state_dim,), dtype=jnp.float64)
+        self.action_target = jnp.zeros(shape=(self.control_dim,), dtype=jnp.float64)
+        self.running_q = jnp.eye(self.state_dim)
+        self.running_r = jnp.eye(self.control_dim)
+        self.terminal_q = jnp.eye(self.state_dim)
+        self.terminal_r = jnp.eye(self.control_dim)
+
+        self.tracking_q = jnp.eye(self.state_dim)
+        self.tracking_r = jnp.eye(self.control_dim)
+        self.tracking_q_T = jnp.eye(self.state_dim)
+        self.tracking_r_T = jnp.zeros(self.control_dim)
+
+        self.r = 0.3
+        """Growth rate of the tumour"""
+        self.a = 3.0
+        """Positive weight parameter"""
+        self.delta = 0.45
+        """Magnitude of the dose administered"""
+        self.T = 20.0
+        self.x0 = jnp.array([0.975])
+
+    def _running_cost(self, x, u):
+        return self.a * x[0] ** 2 + u[0] ** 2
+
+    def _terminal_cost(self, x, u):
+        return 0.0
+
+    def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return jnp.array([0.0])
+
+    def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
+
+    def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
+
+
 class MountainCar(SimulatorCostsAndConstraints):
     """
     Dynamics of pendulum
@@ -621,3 +669,5 @@ def get_simulator_costs(simulator: SimulatorType, scaling: Scaling) -> Simulator
         return Quadrotor2D(**scaling._asdict())
     elif simulator == SimulatorType.RACE_CAR:
         return RaceCar(**scaling._asdict())
+    elif simulator == SimulatorType.CANCER_TREATMENT:
+        return CancerTreatment(**scaling._asdict())

@@ -68,6 +68,7 @@ class SimulatorType(Enum):
     QUADROTOR_EULER = auto()
     QUADROTOR_2D = auto()
     RACE_CAR = auto()
+    CANCER_TREATMENT = auto()
 
 
 class Statistics(Enum):

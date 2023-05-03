@@ -815,6 +815,27 @@ class RaceCar(SimulatorDynamics):
         return self.ode(x, u, self.system_params)
 
 
+class CancerTreatment(SimulatorDynamics):
+    def __init__(self, time_scaling=None, state_scaling=None,
+                 control_scaling=None):
+        super(CancerTreatment, self).__init__(state_dim=1, control_dim=1, system_params=None,
+                                              time_scaling=time_scaling, state_scaling=state_scaling,
+                                              control_scaling=control_scaling)
+
+        self.r = 0.3
+        """Growth rate of the tumour"""
+        self.a = 3.0
+        """Positive weight parameter"""
+        self.delta = 0.45
+        """Magnitude of the dose administered"""
+        self.T = 20.0
+        self.x0 = jnp.array([0.975])
+
+    def _dynamics(self, x, u, t):
+        d_x = self.r * x[0] * jnp.log(1 / x[0]) - u[0] * self.delta * x[0]
+        return jnp.array(d_x).reshape(self.state_dim, )
+
+
 def get_simulator_dynamics(simulator: SimulatorType, scaling: Scaling) -> SimulatorDynamics:
     if simulator == SimulatorType.LOTKA_VOLTERRA:
         return LotkaVolterra(**scaling._asdict())
@@ -844,6 +865,8 @@ def get_simulator_dynamics(simulator: SimulatorType, scaling: Scaling) -> Simula
         return Quadrotor2D(**scaling._asdict())
     elif simulator == SimulatorType.RACE_CAR:
         return RaceCar(**scaling._asdict())
+    elif simulator == SimulatorType.CANCER_TREATMENT:
+        return CancerTreatment(**scaling._asdict())
 
 
 if __name__ == "__main__":

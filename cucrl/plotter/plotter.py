@@ -102,6 +102,7 @@ class Plotter:
         # Plot dynamics derivatives
         figure_dynamics_der, ax_dynamics = plt.subplots(num_traj, self.state_dim,
                                                         figsize=(5 * self.state_dim + 4, 4 * num_traj))
+        ax_dynamics = np.array(ax_dynamics)
         ax_dynamics = ax_dynamics.reshape(num_traj, self.state_dim)
 
         dynamics_stds = jnp.sqrt(jnp.clip(data.dynamics_der_vars, a_min=0))
