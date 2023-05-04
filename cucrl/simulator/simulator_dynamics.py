@@ -688,12 +688,12 @@ class RaceCar(SimulatorDynamics):
 
     @staticmethod
     def _accelerations_dyn(x: jax.Array, u: jax.Array, params: CarParams):
-        i_com = params._get_moment_of_intertia()
+        i_com = params.i_com
         theta, v_x, v_y, w = x[..., 2], x[..., 3], x[..., 4], x[..., 5]
         m = params.m
-        l = params.l
-        d_f = params.d_f * params.g * m
-        d_r = params.d_r * params.g * m
+        l_f = params.l_f
+        d_f = params.d_f #* params.g * m
+        d_r = params.d_r #* params.g * m
         c_f = params.c_f
         c_r = params.c_r
         b_f = params.b_f
@@ -704,8 +704,8 @@ class RaceCar(SimulatorDynamics):
         c_d_min = params.c_d_min
         c_rr = params.c_rr
         a = params.a
-        l_r = params._get_x_com()
-        l_f = l - l_r
+        l_r = params.l_r
+        l = l_f + l_r
         tv_p = params.tv_p
 
         c_d = c_d_min + (c_d_max - c_d_min) * a
@@ -740,14 +740,15 @@ class RaceCar(SimulatorDynamics):
     def _ode_kin(x: jax.Array, u: jax.Array, params: CarParams):
         p_x, p_y, theta, v_x = x[..., 0], x[..., 1], x[..., 2], x[..., 3]
         m = params.m
-        l = params.l
+        l_f = params.l_f
         c_m_1 = params.c_m_1
         c_m_2 = params.c_m_2
         c_d_max = params.c_d_max
         c_d_min = params.c_d_min
         c_rr = params.c_rr
         a = params.a
-        l_r = params._get_x_com()
+        l_r = params.l_r
+        l = l_r + l_f
 
         c_d = c_d_min + (c_d_max - c_d_min) * a
 
@@ -813,7 +814,6 @@ class RaceCar(SimulatorDynamics):
 
     def _dynamics(self, x: jnp.ndarray, u: jnp.ndarray, t: jnp.ndarray) -> jnp.ndarray:
         return self.ode(x, u, self.system_params)
-
 
 class CancerTreatment(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None,

@@ -3,22 +3,25 @@ from flax import struct
 
 @struct.dataclass
 class CarParams:
-    m: float = 0.05
+    m: float = 0.041
+    i_com: float = 27.8e-6
+    l_f: float = 0.029
+    l_r: float = 0.033
     l: float = 0.06
-    a: float = 0.25
+    a: float = 0.0
     b: float = 0.01
     g: float = 9.81
-    d_f: float = 0.2
-    c_f: float = 1.25
-    b_f: float = 2.5
-    d_r: float = 0.2
-    c_r: float = 1.25
-    b_r: float = 2.5
-    c_m_1: float = 0.2
-    c_m_2: float = 0.05
-    c_rr: float = 0.0
+    d_f: float = 1.05 * .192
+    c_f: float = 1.2
+    b_f: float = 2.579
+    d_r: float = 1. * 0.1737 * 1.2
+    c_r: float = 1.2691
+    b_r: float = 3.3852 / 1.2
+    c_m_1: float = 0.287
+    c_m_2: float = 0.054527
+    c_rr: float = 0.051891
     c_d_max: float = 0.1
-    c_d_min: float = 0.01
+    c_d_min: float = 0.000348
     tv_p: float = 0.0
     q_pos: float = 0.1
     q_v: float = 0.1

@@ -30,7 +30,7 @@ if __name__ == '__main__':
     seed = 0
     num_matching_points = 50
     num_visualization_points = 1000
-    num_observation_points = 20
+    num_observation_points = 10
 
     my_initial_conditions = [jnp.array([0.0, 0.0, jnp.pi, 0.0], dtype=jnp.float64)]
     time_horizon = (0, 10)

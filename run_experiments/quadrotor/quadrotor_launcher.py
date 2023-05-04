@@ -1,8 +1,8 @@
-import glucose_exp
+import quadrotor_exp
 from cucrl.utils.representatives import BatchStrategy
 from run_experiments.util import generate_base_command, generate_run_commands
 
-PROJECT_NAME = "Glucose_possible_final_experiment"
+PROJECT_NAME = "Quadrotor3D_potentially_final_experiment"
 
 applicable_configs = {
     'MSS': [BatchStrategy.MAX_KERNEL_DISTANCE_GREEDY, BatchStrategy.MAX_DETERMINANT_GREEDY, BatchStrategy.EQUIDISTANT],
@@ -20,11 +20,11 @@ def main():
                 'project_name': PROJECT_NAME
             }
 
-            cmd = generate_base_command(glucose_exp, flags=flags)
+            cmd = generate_base_command(quadrotor_exp, flags=flags)
             command_list.append(cmd)
 
     # submit jobs
-    generate_run_commands(command_list, num_cpus=1, num_gpus=0, mode='euler', num_hours=23, promt=True, mem=16000)
+    generate_run_commands(command_list, num_cpus=1, num_gpus=1, mode='euler', num_hours=100, promt=True, mem=32000)
 
 
 if __name__ == '__main__':

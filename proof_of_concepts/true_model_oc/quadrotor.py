@@ -19,7 +19,7 @@ def run():
                                0., 0., 0.,
                                0.0, 0.0, 0.0,
                                0.0, 0.0, 0.0], dtype=jnp.float64)
-    num_nodes = 100
+    num_nodes = 50
     optimizer = OptimalCost(simulator_dynamics=system, simulator_costs=cost, num_nodes=num_nodes,
                             time_horizon=time_horizon)
 
