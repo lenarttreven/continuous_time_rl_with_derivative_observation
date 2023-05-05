@@ -43,7 +43,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
     action_dim = 1
 
     def initial_control(x, t):
-        return 0.1 * jnp.sin(t).reshape(1, )
+        return 0.01 * jnp.sin(t).reshape(1, )
 
     run_config = RunConfig(
         seed=seed,

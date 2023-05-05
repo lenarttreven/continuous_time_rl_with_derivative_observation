@@ -95,7 +95,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
             angles_dim=[],
             measurement_collector=MeasurementCollectionConfig(
                 batch_size_per_time_horizon=num_measurement_points,
-                batch_strategy=BatchStrategy.MAX_DETERMINANT_GREEDY,
+                batch_strategy=measurement_selection_strategy,
                 noise_std=0.0,
                 time_horizon=TimeHorizonConfig(type=TimeHorizonType.FIXED, init_horizon=time_horizon[1]),
                 num_hallucination_nodes=100,

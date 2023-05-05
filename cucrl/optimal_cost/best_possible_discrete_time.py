@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jax import jit, vmap
 from jax.lax import scan, cond
-from trajax.optimizers import ILQR, ILQRHyperparams
+from trajax.optimizers import ILQR, ILQRHyperparams, CEMHyperparams, CEM
 
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
 from cucrl.simulator.simulator_dynamics import SimulatorDynamics
@@ -35,7 +35,13 @@ class BestPossibleDiscreteAlgorithm:
         self.time_span = self.dt
 
         self.ilqr = ILQR(self.cost_fn, self.dynamics_fn)
-        self.ilqr_params = ILQRHyperparams(maxiter=100)
+        self.ilqr_params = ILQRHyperparams(maxiter=1000, psd_delta=1e0, make_psd=False)
+        # CEM
+        self.cem_params = CEMHyperparams(max_iter=10, num_samples=400, elite_portion=0.1, evolution_smoothing=0.0,
+                                         sampling_smoothing=0.0)
+        self.max_control = 10 * jnp.ones(shape=(self.simulator_dynamics.control_dim,), dtype=jnp.float64)
+        self.min_control = -10 * jnp.ones(shape=(self.simulator_dynamics.control_dim,), dtype=jnp.float64)
+        self.cem = CEM(self.cost_fn, self.dynamics_fn)
 
         self.eval_dt = self.dt / self.num_low_steps
 
@@ -71,7 +77,23 @@ class BestPossibleDiscreteAlgorithm:
 
     def get_optimal_cost(self, initial_state):
         out = self.ilqr.solve(None, None, initial_state, self.initial_actions, self.ilqr_params)
-
+        # cem_out = self.cem.solve(None, None, initial_state, self.initial_actions, control_low=self.min_control,
+        #                          control_high=self.max_control, hyperparams=self.cem_params,
+        #                          random_key=jax.random.PRNGKey(0))
+        # xs, us, obj =cem_out
+        # x_last, xs_all = self.rollout_eval(us, initial_state)
+        #
+        # us_all = jnp.repeat(us[:, None, :], repeats=self.num_low_steps, axis=1)
+        #
+        # xs_all = xs_all.reshape(-1, self.simulator_dynamics.state_dim)
+        # us_all = us_all.reshape(-1, self.simulator_dynamics.control_dim)
+        # xs_all = jnp.concatenate([initial_state[None, :], xs_all])
+        #
+        # self.best_xs_all = xs_all
+        # self.best_us_all = us_all
+        # self.ts_all = jnp.linspace(self.time_horizon[0], self.time_horizon[1], xs_all.shape[0])
+        #
+        # true_cost = self.cost_fn_eval(xs_all, us_all)
         x_last, xs_all = self.rollout_eval(out.us, initial_state)
 
         us_all = jnp.repeat(out.us[:, None, :], repeats=self.num_low_steps, axis=1)
@@ -134,8 +156,6 @@ class BestPossibleDiscreteAlgorithm:
 if __name__ == "__main__":
     from jax.config import config
     import matplotlib.pyplot as plt
-    from cucrl.simulator.simulator_costs import RaceCar as RaceCarCost
-    from cucrl.simulator.simulator_dynamics import RaceCar as RaceCarDynamics
 
     config.update("jax_enable_x64", True)
 
@@ -153,15 +173,37 @@ if __name__ == "__main__":
     # plt.show()
 
     # Race Car
-    state_scaling = jnp.diag(jnp.array([1.0, 1.0, 1.0, 1.0, 10.0, 1.0]))
-    simulator_dynamics = RaceCarDynamics(state_scaling=state_scaling)
-    simulator_costs = RaceCarCost(state_scaling=state_scaling)
-    best_possible_algorithm = BestPossibleDiscreteAlgorithm(simulator_dynamics, simulator_costs, time_horizon=(0, 10),
-                                                            num_nodes=50)
+    # state_scaling = jnp.diag(jnp.array([1.0, 1.0, 1.0, 1.0, 10.0, 1.0]))
+    # simulator_dynamics = RaceCarDynamics(state_scaling=state_scaling)
+    # simulator_costs = RaceCarCost(state_scaling=state_scaling)
+    # best_possible_algorithm = BestPossibleDiscreteAlgorithm(simulator_dynamics, simulator_costs, time_horizon=(0, 10),
+    #                                                         num_nodes=50)
+    # print("Best discrete cost: ",
+    #       best_possible_algorithm.get_optimal_cost(jnp.array([0, 0, 0, 0, 0, 0], dtype=jnp.float64)))
+    #
+    # plt.plot(best_possible_algorithm.ts_all, best_possible_algorithm.best_xs_all)
+    # plt.show()
+    # plt.plot(best_possible_algorithm.ts_all[:-1], jnp.tanh(best_possible_algorithm.best_us_all))
+    # plt.show()
+
+    # Quadrotor
+    from cucrl.simulator.simulator_costs import QuadrotorEuler as QuadrotorEulerCost
+    from cucrl.simulator.simulator_dynamics import QuadrotorEuler as QuadrotorEulerDynamics
+
+    state_scaling = jnp.diag(jnp.array([1, 1, 1, 1, 1, 1, 10, 10, 1, 10, 10, 1], dtype=jnp.float64))
+    simulator_dynamics = QuadrotorEulerDynamics(state_scaling=state_scaling)
+    simulator_costs = QuadrotorEulerCost(state_scaling=state_scaling)
+    best_possible_algorithm = BestPossibleDiscreteAlgorithm(simulator_dynamics, simulator_costs, time_horizon=(0, 15),
+                                                            num_nodes=20)
     print("Best discrete cost: ",
-          best_possible_algorithm.get_optimal_cost(jnp.array([0, 0, 0, 0, 0, 0], dtype=jnp.float64)))
+          best_possible_algorithm.get_optimal_cost(jnp.array([1.0, 1.0, 1.0,
+                                                              0., 0., 0.,
+                                                              0.0, 0.0, 0.0,
+                                                              0.0, 0.0, 0.0], dtype=jnp.float64)))
 
     plt.plot(best_possible_algorithm.ts_all, best_possible_algorithm.best_xs_all)
+    plt.title('Xs')
     plt.show()
     plt.plot(best_possible_algorithm.ts_all[:-1], jnp.tanh(best_possible_algorithm.best_us_all))
+    plt.title('Us')
     plt.show()
