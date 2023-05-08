@@ -368,6 +368,14 @@ class LearnSystem:
         return DataLearn(dynamics_data=dynamics_data)
 
     def log_measurement_selection(self, episode: int, measurement_selection: MeasurementSelection):
+        directory = os.path.join(wandb.run.dir, 'mss')
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        data_path = os.path.join('mss', 'measurement_selection_{}.pkl'.format(episode))
+        with open(os.path.join(wandb.run.dir, data_path), 'wb') as handle:
+            pickle.dump(measurement_selection, handle)
+        wandb.save(os.path.join(wandb.run.dir, data_path), wandb.run.dir)
+
         fig_measurement_selection, fig_measurement_selection_space, fig_phase = self.plotter.plot_measurement_selection(
             measurement_selection)
         fig_measurement_selection.tight_layout()
