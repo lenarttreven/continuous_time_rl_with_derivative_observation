@@ -135,6 +135,53 @@ class Pendulum(SimulatorCostsAndConstraints):
                               u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 
 
+class Acrobot(SimulatorCostsAndConstraints):
+    """
+    Dynamics of pendulum
+    """
+
+    def __init__(self, system_params=jnp.array([1.0, 1.0, 0.2]), time_scaling=None, state_scaling=None,
+                 control_scaling=None):
+        super().__init__(state_dim=4, control_dim=1, system_params=system_params, time_scaling=time_scaling,
+                         state_scaling=state_scaling, control_scaling=control_scaling)
+
+        self.state_target = jnp.array([jnp.pi, jnp.pi, 0, 0], dtype=jnp.float64)
+        self.action_target = jnp.array([0], dtype=jnp.float64)
+        self.running_q = jnp.eye(self.state_dim)
+        self.running_r = jnp.eye(self.control_dim)
+        self.terminal_q = jnp.eye(self.state_dim)
+        self.terminal_q_mpc = jnp.eye(self.state_dim)
+        self.terminal_r = 0 * jnp.eye(self.control_dim)
+
+        self.tracking_q = jnp.eye(self.state_dim)
+        self.tracking_r = jnp.eye(self.control_dim)
+        self.tracking_q_T = jnp.eye(self.state_dim)
+        self.tracking_r_T = 0 * jnp.eye(self.control_dim)
+
+    def _running_cost(self, x, u):
+        return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.running_q,
+                              r=self.running_r)
+
+    def _terminal_cost(self, x, u):
+        return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.terminal_q,
+                              r=self.terminal_r)
+
+    def _terminal_cost_mpc(self, x, u):
+        return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.terminal_q_mpc,
+                              r=self.terminal_r)
+
+    def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return jnp.array([0.0])
+
+    def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
+
+    def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
+                              u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
+
+
 class Quadrotor2D(SimulatorCostsAndConstraints):
     def __init__(self, system_params=None, time_scaling=None, state_scaling=None, control_scaling=None):
         self.g = 2.0
@@ -713,6 +760,8 @@ def get_simulator_costs(simulator: SimulatorType, scaling: Scaling) -> Simulator
         return SwimmerMujoco(**scaling._asdict())
     elif simulator == SimulatorType.CARTPOLE:
         return CartPole(**scaling._asdict())
+    elif simulator == SimulatorType.ACROBOT:
+        return Acrobot(**scaling._asdict())
     elif simulator == SimulatorType.QUADROTOR_QUATERNIONS:
         return QuadrotorQuaternions(**scaling._asdict())
     elif simulator == SimulatorType.QUADROTOR_EULER:

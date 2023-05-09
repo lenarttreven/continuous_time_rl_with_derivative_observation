@@ -55,7 +55,7 @@ class Dynamics(Enum):
 class SimulatorType(Enum):
     LOTKA_VOLTERRA = auto()
     LORENZ = auto()
-    DOUBLE_PENDULUM = auto()
+    ACROBOT = auto()
     LINEAR = auto()
     PENDULUM = auto()
     VAN_DER_POL_OSCILATOR = auto()

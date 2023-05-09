@@ -31,7 +31,7 @@ def plot_optimal_trajectory(sim: SimulatorDynamics, sim_cc: SimulatorCostsAndCon
         assert x.shape == (sim.state_dim,) and u.shape == (sim.control_dim,)
         return x + sim.dynamics(x, u, t.reshape(1, )) * dt
 
-    ilqr_params = ILQRHyperparams(maxiter=100, make_psd=True, psd_delta=1e-2)
+    ilqr_params = ILQRHyperparams(maxiter=10000, make_psd=False, psd_delta=1e-2)
     ts = jnp.linspace(time_horizon[0], time_horizon[1], num_nodes + 1)
 
     optimizer = ILQR(cost_fn, dynamics_fn)
@@ -45,6 +45,7 @@ def plot_optimal_trajectory(sim: SimulatorDynamics, sim_cc: SimulatorCostsAndCon
     plt.title(title)
     plt.legend()
     plt.show()
+    return out
 
 
 def pendulum_oc():
@@ -87,6 +88,16 @@ def cartpole_oc():
     plot_optimal_trajectory(sim, sim_cc, time_horizon=(0, 10), num_nodes=10000,
                             initial_state=jnp.array([jnp.pi, 0.0, 0.0, 0.0], dtype=jnp.float64), title='Cart Pole')
 
+def acrobot_oc():
+    from cucrl.simulator.simulator_costs import Acrobot as DoublePendulumCosts
+    from cucrl.simulator.simulator_dynamics import Acrobot
+    sim = Acrobot()
+    sim_cc = DoublePendulumCosts()
+
+    out = plot_optimal_trajectory(sim, sim_cc, time_horizon=(0, 10), num_nodes=1000,
+                            initial_state=jnp.array([0.0, 0.0, 0.0, 0.0], dtype=jnp.float64), title='Double Pendulum')
+    return out
+
 
 if __name__ == '__main__':
     from jax.config import config
@@ -94,6 +105,7 @@ if __name__ == '__main__':
     config.update("jax_enable_x64", True)
 
     # cartpole_oc()
-    mountain_car_oc()
+    # mountain_car_oc()
+    out = acrobot_oc()
     # furuta_pendulum_oc()
     # pendulum_oc()
