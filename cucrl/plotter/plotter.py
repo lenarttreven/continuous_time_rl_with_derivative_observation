@@ -403,7 +403,7 @@ def multicolored_lines(fig, ax, x, y, z):
     return fig, ax
 
 
-def colorline(x, y, z=None, cmap='Greens', linewidth=2, alpha=1.0):
+def colorline(x, y, z=None, cmap='autumn', linewidth=2, alpha=1.0):
     """
     http://nbviewer.ipython.org/github/dpsanders/matplotlib-examples/blob/master/colorline.ipynb
     http://matplotlib.org/examples/pylab_examples/multicolored_line.html

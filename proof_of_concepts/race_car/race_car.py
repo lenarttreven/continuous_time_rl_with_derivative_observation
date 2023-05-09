@@ -38,9 +38,9 @@ def run_race_car():
         assert x.shape == (x_dim,) and u.shape == (u_dim,)
         return x + dt * dynamics_model.dynamics(x, u, t.reshape(1, ))
 
-    ilqr_params = ILQRHyperparams(maxiter=1000, make_psd=False, psd_delta=1e-2)
+    ilqr_params = ILQRHyperparams(maxiter=1000, make_psd=True, psd_delta=1e-2)
     initial_state = jnp.array([0, 0, 0, 0, 0, 0], dtype=jnp.float64)
-    initial_actions = 0.01 * jnp.ones(shape=(num_nodes, u_dim))
+    initial_actions = 0.1 * jnp.ones(shape=(num_nodes, u_dim))
 
     ilqr = ILQR(cost, dynamics)
     out = ilqr.solve(None, None, initial_state, initial_actions, ilqr_params)
