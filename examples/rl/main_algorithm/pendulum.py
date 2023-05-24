@@ -1,11 +1,8 @@
-import argparse
-import os
-
 import jax.numpy as jnp
 import jax.random
+import wandb
 from jax.config import config
 
-import wandb
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
@@ -21,12 +18,7 @@ from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 config.update("jax_enable_x64", True)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data_seed', type=int, default=0)
-    args = parser.parse_args()
-
-    data_generation_seed = args.data_seed
-
+    data_generation_seed = 0
     seed = 0
     num_matching_points = 50
     num_visualization_points = 1000
@@ -39,14 +31,11 @@ if __name__ == '__main__':
 
     track_wandb = True
     track_just_loss = True
-    debug = False
     visualization = True
-    numerical_correction = 0
 
     beta = 1
     state_dim = 2
     action_dim = 1
-    num_trajectories = len(initial_conditions)
 
 
     def initial_control(x, t):
@@ -88,13 +77,13 @@ if __name__ == '__main__':
             policy=PolicyConfig(
                 online_tracking=OnlineTrackingConfig(
                     mpc_dt=0.02,
-                    time_horizon=5.0,
+                    time_horizon=6.0,
                     num_nodes=50,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(
                     num_independent_runs=4,
-                    exploration_strategy=ExplorationStrategy.MEAN,
+                    exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA_TIME,
                     exploration_norm=Norm.L_INF,
                     num_nodes=100,
                     beta_exploration=BetaType.GP
@@ -104,7 +93,7 @@ if __name__ == '__main__':
             angles_dim=[0, ],
             measurement_collector=MeasurementCollectionConfig(
                 batch_size_per_time_horizon=10,
-                batch_strategy=BatchStrategy.MAX_DETERMINANT_GREEDY,
+                batch_strategy=BatchStrategy.MAX_KERNEL_DISTANCE_GREEDY,
                 noise_std=0.0,
                 time_horizon=TimeHorizonConfig(type=TimeHorizonType.FIXED, init_horizon=10.0),
                 num_hallucination_nodes=100,
@@ -126,22 +115,12 @@ if __name__ == '__main__':
     )
 
     if track_wandb:
-        home_folder = os.getcwd()
-        home_folder = '/'.join(home_folder.split('/')[:4])
-        group_name = "Testing"
-        if home_folder == '/cluster/home/trevenl':
-            wandb.init(
-                dir='/cluster/scratch/trevenl',
-                project="Pendulum",
-                group=group_name,
-                config=namedtuple_to_dict(run_config),
-            )
-        else:
-            wandb.init(
-                project="Pendulum",
-                group=group_name,
-                config=namedtuple_to_dict(run_config),
-            )
+        group_name = "Test"
+        wandb.init(
+            project="Pendulum",
+            group=group_name,
+            config=namedtuple_to_dict(run_config),
+        )
         config = wandb.config
 
     model = LearnSystem(run_config)

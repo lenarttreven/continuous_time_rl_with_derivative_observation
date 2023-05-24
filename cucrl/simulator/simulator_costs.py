@@ -7,7 +7,6 @@ from jax import jit
 
 from cucrl.cost.quadratic_cost import quadratic_cost
 from cucrl.main.config import Scaling
-from cucrl.utils.race_car_params import CarParams
 from cucrl.utils.representatives import SimulatorType
 
 pytree = Any
@@ -314,47 +313,6 @@ class MountainCar(SimulatorCostsAndConstraints):
         return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
                               u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 
-
-class RaceCar(SimulatorCostsAndConstraints):
-    def __init__(self, system_params: CarParams = CarParams(), time_scaling=None, state_scaling=None,
-                 control_scaling=None):
-        super().__init__(state_dim=6, control_dim=2, system_params=system_params, time_scaling=time_scaling,
-                         state_scaling=state_scaling, control_scaling=control_scaling)
-        self.state_target = jnp.array([5, -2, 0, 0, 0, 0], dtype=jnp.float64)
-
-        self.final_tracking_state = jnp.array([5.16399081e+00, -2.06869377e+00, -4.02571791e-01, 1.35987639e-01,
-                                               -2.20793977e-04, -7.56103134e-04], dtype=jnp.float64)
-
-        self.action_target = jnp.array([0, 0], dtype=jnp.float64)
-        self.running_q = jnp.eye(self.state_dim)
-        self.running_r = jnp.eye(self.control_dim)
-        self.terminal_q = 0 * jnp.eye(self.state_dim)
-        self.terminal_r = 0 * jnp.eye(self.control_dim)
-
-        self.tracking_q = jnp.eye(self.state_dim)
-        self.tracking_r = jnp.eye(self.control_dim)
-        self.tracking_q_T = 5 * jnp.eye(self.state_dim)
-        self.tracking_r_T = jnp.zeros(self.control_dim)
-
-    def _running_cost(self, x, u):
-        u = jnp.tanh(u)
-        u = u.at[0].set(u[0] * self.system_params.max_steering)
-        return 100 * jnp.sum(u ** 2) + jnp.sum((x[:2] - self.state_target[:2]) ** 2)
-
-    def _terminal_cost(self, x, u):
-        # return jnp.zeros(shape=())
-        u = jnp.tanh(u)
-        u = u.at[0].set(u[0] * self.system_params.max_steering)
-        return jnp.sum(u ** 2) + jnp.sum((x[:2] - self.state_target[:2]) ** 2)
-
-    def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
-        return jnp.array([0.0])
-
-    def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
-        return jnp.sum(u ** 2) + jnp.sum(x[:2] ** 2)
-
-    def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
-        return jnp.sum(u ** 2) + jnp.sum(x[:2] ** 2)
 
 
 class Bicycle(SimulatorCostsAndConstraints):
@@ -719,8 +677,6 @@ def get_simulator_costs(simulator: SimulatorType, scaling: Scaling) -> Simulator
         return QuadrotorEuler(**scaling._asdict())
     elif simulator == SimulatorType.QUADROTOR_2D:
         return Quadrotor2D(**scaling._asdict())
-    elif simulator == SimulatorType.RACE_CAR:
-        return RaceCar(**scaling._asdict())
     elif simulator == SimulatorType.CANCER_TREATMENT:
         return CancerTreatment(**scaling._asdict())
     elif simulator == SimulatorType.GLUCOSE:

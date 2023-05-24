@@ -1,12 +1,10 @@
-import os
 from abc import ABC, abstractmethod
 from functools import partial
 from typing import Tuple, Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
-import mujoco
-from jax import jit, pure_callback
+from jax import jit
 
 from cucrl.main.config import Scaling
 from cucrl.simulator.prepare_matrix import create_matrix
@@ -426,43 +424,6 @@ class Swimmer(SimulatorDynamics):
         return jnp.array([x_dot_0, x_dot_1, x_dot_2, x_dot_3, x_dot_4, x_dot_5, x_dot_6, x_dot_7], dtype=jnp.float64)
 
 
-class SwimmerMujoco(SimulatorDynamics):
-    """
-    Dynamics of pendulum
-    """
-
-    def __init__(self, system_params=None, time_scaling=None, state_scaling=None,
-                 control_scaling=None):
-        super().__init__(state_dim=10, control_dim=2, system_params=system_params, time_scaling=time_scaling,
-                         state_scaling=state_scaling, control_scaling=control_scaling)
-        _this_file_path = os.path.abspath(__file__)
-        folder_path = os.path.dirname(_this_file_path)
-        filename = os.path.join(folder_path, 'assets/swimmer.xml')
-        self.mjModel = mujoco.MjModel.from_xml_path(filename=filename, assets=None)
-        self.mjData = mujoco.MjData(self.mjModel)
-
-    def _dynamics(self, x, u, t):
-        # Split x to position and it's velocity
-        q_pos = x[:5]
-        q_vel = x[5:]
-
-        # Update mujoco model
-
-        def get_acc(q_pos, q_vel, u):
-            self.mjData.qpos = jnp.copy(q_pos)
-            self.mjData.qvel = jnp.copy(q_vel)
-            self.mjData.ctrl = jnp.copy(u)
-            mujoco.mj_forward(self.mjModel, self.mjData)
-            mujoco.mj_rnePostConstraint(self.mjModel, self.mjData)
-            return self.mjData.qacc
-
-        # Compute position and velocity derivatives
-        q_pos_dot = q_vel
-        q_vel_dot = pure_callback(get_acc, q_pos, q_pos, q_vel, u)
-
-        return jnp.concatenate([q_pos_dot, q_vel_dot], dtype=jnp.float64)
-
-
 class QuadrotorEuler(SimulatorDynamics):
     """
     Dynamics of quadrotor with 12 dimensional state space and 4 dimensional control
@@ -855,6 +816,7 @@ class CarParams(NamedTuple):
     use_kinematic_model: bool = True
     tv_p: jax.Array = jnp.array(0.0)
 
+
 class RaceCar(SimulatorDynamics):
 
     def __init__(self, time_scaling=None, state_scaling=None, params: CarParams = CarParams(),
@@ -864,7 +826,6 @@ class RaceCar(SimulatorDynamics):
                                       control_scaling=control_scaling)
         self.control_ratio = control_ratio
         self.system_params = params
-
 
     @staticmethod
     def _ode_kin(x, u, params: CarParams):
@@ -1085,8 +1046,6 @@ def get_simulator_dynamics(simulator: SimulatorType, scaling: Scaling) -> Simula
         return FurutaPendulum(**scaling._asdict())
     elif simulator == SimulatorType.DOUBLE_PENDULUM:
         return DoublePendulum(**scaling._asdict())
-    elif simulator == SimulatorType.SWIMMER_MUJOCO:
-        return SwimmerMujoco(**scaling._asdict())
     elif simulator == SimulatorType.QUADROTOR_QUATERNIONS:
         return QuadrotorQuaternions(**scaling._asdict())
     elif simulator == SimulatorType.QUADROTOR_EULER:
