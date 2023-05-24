@@ -11,8 +11,8 @@ from jax import jit, pure_callback
 from cucrl.main.config import Scaling
 from cucrl.simulator.prepare_matrix import create_matrix
 from cucrl.utils.euler_angles import euler_to_rotation, move_frame
+from cucrl.utils.helper_functions import AngleNormalizer
 from cucrl.utils.quaternions import Quaternion
-# from cucrl.utils.race_car_params import CarParams
 from cucrl.utils.representatives import SimulatorType
 
 pytree = Any
@@ -237,11 +237,14 @@ class MountainCar(SimulatorDynamics):
 
 
 class FurutaPendulum(SimulatorDynamics):
-    def __init__(self, system_params=jnp.array([1.0, 0.0, 1.0, 1.0, 1.0, 1.0]), g=0.2, time_scaling=None,
-                 state_scaling=None,
-                 control_scaling=None):
+    def __init__(self, system_params=jnp.array([8.084e-01, 9.894e-04, 6.361e-03, 7.027e-04, 2.000e+0, 1.650e+0]),
+                 g=9.81, time_scaling=None, state_scaling=None, control_scaling=None):
+        # system_params = jnp.array([0.1, 0.0, 1.0, 0.001, 0.1, 1.0])
+        # g = 0.2
         super().__init__(state_dim=4, control_dim=1, system_params=system_params, time_scaling=time_scaling,
                          state_scaling=state_scaling, control_scaling=control_scaling)
+        self.normalizer = AngleNormalizer(state_dim=self.state_dim, control_dim=self.control_dim, angles_dim=[0, 2],
+                                          state_scaling=self.state_scaling)
         """
         https://lucris.lub.lu.se/ws/files/4453844/8727127.pdf
         systems_params = (J, M, m_a, m_p, l_a, l_p)
@@ -252,6 +255,10 @@ class FurutaPendulum(SimulatorDynamics):
         self.beta = (M + 1 / 3 * m_p) * l_p ** 2
         self.gamma = (M + 1 / 2 * m_p) * l_a * l_p
         self.delta = (M + 1 / 2 * m_p) * g * l_p
+        # self.alpha = 0.0033472
+        # self.beta = 0.0038852
+        # self.gamma = 0.0024879
+        # self.delta = 0.097625
 
     def _dynamics(self, x, u, t):
         return self.true_dynamics(x, u, t)
@@ -260,8 +267,8 @@ class FurutaPendulum(SimulatorDynamics):
         """
             x is represented in form (phi, dot{phi}, theta, dot{theta})
         """
-
-        t_phi = u.reshape()
+        x = self.normalizer.transform_x(x)
+        t_phi = u[0]
         t_theta = 0
 
         x0_dot = x[1]

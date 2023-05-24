@@ -7,6 +7,7 @@ from jax import jit
 
 from cucrl.cost.quadratic_cost import quadratic_cost
 from cucrl.main.config import Scaling
+from cucrl.utils.helper_functions import AngleNormalizer
 from cucrl.utils.race_car_params import CarParams
 from cucrl.utils.representatives import SimulatorType
 
@@ -510,35 +511,43 @@ class FurutaPendulum(SimulatorCostsAndConstraints):
                  control_scaling=None):
         super().__init__(state_dim=4, control_dim=1, system_params=system_params, time_scaling=time_scaling,
                          state_scaling=state_scaling, control_scaling=control_scaling)
+        self.normalizer = AngleNormalizer(state_dim=self.state_dim, control_dim=self.control_dim, angles_dim=[0, 2],
+                                          state_scaling=self.state_scaling)
         self.state_target = jnp.array([0.0, 0.0, 0.0, 0.0], dtype=jnp.float64)
         self.action_target = jnp.array([0.0])
         self.running_q = jnp.eye(self.state_dim)
-        self.running_r = jnp.eye(self.control_dim)
+
+        self.running_r = 1e-2 * jnp.eye(self.control_dim)
 
         self.terminal_q = jnp.eye(self.state_dim)
         self.terminal_r = 0 * jnp.eye(self.control_dim)
 
         self.tracking_q = jnp.eye(self.state_dim)
-        self.tracking_r = jnp.eye(self.control_dim)
-        self.tracking_q_T = 5 * jnp.eye(self.state_dim)
-        self.tracking_r_T = 0 * jnp.eye(self.control_dim)
+        self.tracking_r = 1e0 * jnp.eye(self.control_dim)
+        self.tracking_q_T = 1 * jnp.eye(self.state_dim)
+        self.tracking_r_T = 1 * jnp.eye(self.control_dim)
 
     def _running_cost(self, x, u):
+        # x = self.normalizer.transform_x(x)
         return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.running_q,
                               r=self.running_r)
 
     def _terminal_cost(self, x, u):
+        # x = self.normalizer.transform_x(x)
         return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.terminal_q,
                               r=self.terminal_r)
 
     def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        # x = self.normalizer.transform_x(x)
         return jnp.array([0.0])
 
     def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        # x = self.normalizer.transform_x(x)
         return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
                               u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
 
     def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        # x = self.normalizer.transform_x(x)
         return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
                               u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 

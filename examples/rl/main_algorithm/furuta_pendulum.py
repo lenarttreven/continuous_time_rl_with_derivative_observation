@@ -15,8 +15,8 @@ from cucrl.schedules.betas import BetasType
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.helper_functions import namedtuple_to_dict
 from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, BNNTypes
-from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, NumericalComputation, Norm, BetaType
-from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
+from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, BetaType
+from cucrl.utils.representatives import TimeHorizonType, BatchStrategy, MinimizationMethod
 
 config.update("jax_enable_x64", True)
 
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     num_observation_points = 10
 
     my_initial_conditions = [jnp.array([0.0, 0.0, jnp.pi, 0.0], dtype=jnp.float64)]
-    time_horizon = (0, 10)
+    time_horizon = (0.0, 5.0)
     noise_scalar = 0.01
 
     beta = 1
@@ -52,14 +52,14 @@ if __name__ == '__main__':
 
 
     def initial_control(x, t):
-        return jnp.sin(t).reshape(1, )
+        return 0.2 * jnp.sin(2 * t).reshape(1, )
 
 
     run_config = RunConfig(
         seed=seed,
         data_generation=DataGenerationConfig(
             scaling=Scaling(state_scaling=jnp.eye(state_dim),
-                            control_scaling=jnp.eye(action_dim),
+                            control_scaling=0.1 * jnp.eye(action_dim),
                             time_scaling=jnp.ones(shape=(1,))),
             data_generation_key=jax.random.PRNGKey(data_generation_seed),
             simulator_step_size=0.001,
@@ -90,17 +90,16 @@ if __name__ == '__main__':
             policy=PolicyConfig(
                 online_tracking=OnlineTrackingConfig(
                     mpc_dt=0.02,
-                    time_horizon=5.0,
-                    num_nodes=200,
+                    time_horizon=3.0,
+                    num_nodes=300,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(
                     num_independent_runs=4,
                     exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA_TIME,
-                    exploration_norm=Norm.L_INF,
-                    numerical_method=NumericalComputation.LGL,
                     num_nodes=1000,
-                    beta_exploration=BetaType.GP
+                    beta_exploration=BetaType.GP,
+                    minimization_method=MinimizationMethod.ILQR
                 ),
                 initial_control=initial_control,
             ),
@@ -109,7 +108,7 @@ if __name__ == '__main__':
                 batch_size_per_time_horizon=num_observation_points,
                 batch_strategy=BatchStrategy.MAX_DETERMINANT_GREEDY,
                 noise_std=0.0,
-                time_horizon=TimeHorizonConfig(type=TimeHorizonType.FIXED, init_horizon=10.0),
+                time_horizon=TimeHorizonConfig(type=TimeHorizonType.FIXED, init_horizon=time_horizon[1]),
                 num_hallucination_nodes=100,
                 num_interpolated_values=1000,
             )

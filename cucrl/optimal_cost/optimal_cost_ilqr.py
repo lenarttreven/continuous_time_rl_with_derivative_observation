@@ -25,7 +25,7 @@ class OptimalCost:
 
         self.dt = (self.time_horizon[1] - self.time_horizon[0]) / num_nodes
         self.ts = jnp.linspace(self.time_horizon[0], self.time_horizon[1], num_nodes + 1)
-        self.ilqr_params = ILQRHyperparams(maxiter=100)
+        self.ilqr_params = ILQRHyperparams(maxiter=1000, make_psd=False, psd_delta=1e0)
         self.ilqr = ILQR(self.cost, self.dynamics)
         self.results = None
 

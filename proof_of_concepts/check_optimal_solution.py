@@ -94,7 +94,7 @@ def acrobot_oc():
     sim = Acrobot()
     sim_cc = DoublePendulumCosts()
 
-    out = plot_optimal_trajectory(sim, sim_cc, time_horizon=(0, 10), num_nodes=1000,
+    out = plot_optimal_trajectory(sim, sim_cc, time_horizon=(0, 10), num_nodes=100,
                             initial_state=jnp.array([0.0, 0.0, 0.0, 0.0], dtype=jnp.float64), title='Double Pendulum')
     return out
 

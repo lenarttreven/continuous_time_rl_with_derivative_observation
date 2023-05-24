@@ -2,6 +2,7 @@ import time
 from functools import partial
 from typing import List, Sequence, Optional, Union, Dict, NamedTuple
 
+import chex
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -29,7 +30,7 @@ class DataStatsBNN(NamedTuple):
 
 class DeterministicEnsemble:
     def __init__(self, input_dim: int, output_dim: int, features: List[int], num_particles: int,
-                 normalizer: Normalizer = None, weight_decay: float = 1.0):
+                 normalizer: Normalizer, weight_decay: float = 1.0):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.num_particles = num_particles
@@ -43,20 +44,20 @@ class DeterministicEnsemble:
         self.normalizer = normalizer
 
     def _apply_train(self, params, stats, x, data_stats: DataStatsBNN):
-        assert x.shape == (self.input_dim,)
+        chex.assert_shape(x, (self.input_dim,))
         x = self.normalizer.normalize(x, data_stats.input_stats)
         return self.model.apply({'params': params, **stats}, x, mutable=stats.keys(), train=True)
 
     def apply_eval(self, params, stats, x, data_stats: DataStatsBNN):
-        assert x.shape == (self.input_dim,)
+        chex.assert_shape(x, (self.input_dim,))
         x = self.normalizer.normalize(x, data_stats.input_stats)
         out = self.model.apply({'params': params, **stats}, x)
         return self.normalizer.denormalize(out, data_stats.output_stats)
 
-    def _nll(self, pred_raw: jax.Array, y_batch: jax.Array, data_std_batch: jax.Array):
-        assert y_batch.shape == data_std_batch.shape
-        log_prob = norm.logpdf(y_batch[jnp.newaxis, :], loc=pred_raw,
-                               scale=data_std_batch[jnp.newaxis, :])
+    @staticmethod
+    def _nll(pred_raw: jax.Array, y_batch: jax.Array, data_std_batch: jax.Array):
+        chex.assert_equal_shape([y_batch, data_std_batch])
+        log_prob = norm.logpdf(y_batch[jnp.newaxis, :], loc=pred_raw, scale=data_std_batch[jnp.newaxis, :])
         return - jnp.mean(log_prob)
 
     def _neg_log_posterior(self, pred_raw: jax.Array, y_batch: jax.Array, data_std_batch: jax.Array):
@@ -155,7 +156,7 @@ class DeterministicEnsemble:
             params, stats, xs, ys, ys_stds, ps, data_stats, test_alphas)
         indices = jnp.argmin(errors, axis=0)
         best_alpha = test_alpha[indices]
-        assert best_alpha.shape == (self.output_dim,)
+        chex.assert_shape(best_alpha, (self.output_dim,))
         return best_alpha
 
     def _calibration_errors(self, params, stats, xs, ys, ys_stds, ps, data_stats: DataStatsBNN, alpha) -> jax.Array:
@@ -164,17 +165,20 @@ class DeterministicEnsemble:
         return jnp.mean((ps - ps_hat) ** 2, axis=0)
 
     def calculate_calibration_score(self, params, stats, xs, ys, ys_stds, ps, data_stats: DataStatsBNN, alpha):
-        assert alpha.shape == (self.output_dim,)
+        chex.assert_shape(alpha, (self.output_dim,))
 
         def calculate_score(x, y, y_std):
             assert x.shape == (self.input_dim,) and y.shape == y_std.shape == (self.output_dim,)
+            chex.assert_shape(x, (self.input_dim,))
+            chex.assert_shape(y, (self.output_dim,))
+            chex.assert_equal_shape([y, y_std])
             preds = vmap(self.apply_eval, in_axes=(0, 0, None, None), out_axes=0)(params, stats, x, data_stats)
             means, stds = preds.mean(axis=0), preds.std(axis=0)
-            assert stds.shape == (self.output_dim,)
+            chex.assert_shape(stds, (self.output_dim,))
             cdfs = vmap(norm.cdf)(y, means, stds * alpha + y_std)
 
             def check_cdf(cdf):
-                assert cdf.shape == ()
+                chex.assert_shape(cdf, ())
                 return cdf <= ps
 
             return vmap(check_cdf, out_axes=1)(cdfs)
@@ -206,7 +210,7 @@ if __name__ == '__main__':
 
     noise_level = 0.1
     d_l, d_u = 0, 10
-    xs = jnp.linspace(d_l, d_u, 30).reshape(-1, 1)
+    xs = jnp.linspace(d_l, d_u, 256).reshape(-1, 1)
     ys = jnp.concatenate([jnp.sin(xs), jnp.cos(xs)], axis=1)
     ys = ys + noise_level * random.normal(key=random.PRNGKey(0), shape=ys.shape)
     data_std = noise_level * jnp.ones(shape=ys.shape)
@@ -217,7 +221,7 @@ if __name__ == '__main__':
                                      state_scaling=jnp.eye(input_dim), )
     normalizer = Normalizer(state_dim=input_dim, action_dim=output_dim, angle_layer=angle_layer)
 
-    num_particles = 1
+    num_particles = 10
     model = DeterministicEnsemble(input_dim=input_dim, output_dim=output_dim, features=[64, 64, 64],
                                   num_particles=num_particles, normalizer=normalizer)
 
@@ -229,8 +233,8 @@ if __name__ == '__main__':
         group='test group',
     )
 
-    model_params, model_stats = model.fit_model(dataset=train_data, num_epochs=100, data_stats=data_stats,
-                                                data_std=data_std, batch_size=16)
+    model_params, model_stats = model.fit_model(dataset=train_data, num_epochs=5000, data_stats=data_stats,
+                                                data_std=data_std, batch_size=32)
     print(f"Training time: {time.time() - start_time:.2f} seconds")
 
     test_xs = jnp.linspace(-5, 15, 1000).reshape(-1, 1)
@@ -285,7 +289,6 @@ if __name__ == '__main__':
         plt.show()
 
     for j in range(output_dim):
-        # plt.scatter(xs.reshape(-1), ys[:, j], label='Data', color='red')
         for i in range(num_particles):
             plt.plot(test_xs, preds[i, :, j], label='NN prediction', color='black', alpha=0.3)
         plt.plot(test_xs, jnp.mean(preds[..., j], axis=0), label='Mean', color='blue')

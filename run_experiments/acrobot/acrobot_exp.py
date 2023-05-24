@@ -28,16 +28,16 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
     num_visualization_points = 1000
     num_observation_points = 10
 
-    my_initial_conditions = [jnp.array([0.0, 0.0, jnp.pi, 0.0], dtype=jnp.float64)]
+    my_initial_conditions = [jnp.array([0.0, 0.0, 0.0, 0.0])]
 
-    time_horizon = (0.0, 5.0)
+    time_horizon = (0, 10)
 
     beta = 1
     state_dim = 4
     action_dim = 1
 
     noise_scalar = 0.01
-    my_stds_for_simulation = jnp.array(state_dim * [noise_scalar], dtype=jnp.float64)
+    my_stds_for_simulation = noise_scalar * jnp.ones(shape=(4,), dtype=jnp.float64)
     my_simulator_parameters = {}
 
     track_wandb = True
@@ -45,17 +45,17 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
     visualization = True
 
     def initial_control(x, t):
-        return jnp.sin(t).reshape(1, )
+        return jnp.array([jnp.sin(t).reshape(), ], dtype=jnp.float64)
 
     run_config = RunConfig(
         seed=seed,
         data_generation=DataGenerationConfig(
             scaling=Scaling(state_scaling=jnp.eye(state_dim),
-                            control_scaling=0.1 * jnp.eye(action_dim),
+                            control_scaling=jnp.eye(action_dim),
                             time_scaling=jnp.ones(shape=(1,))),
             data_generation_key=jax.random.PRNGKey(data_seed),
             simulator_step_size=0.001,
-            simulator_type=SimulatorType.FURUTA_PENUDLUM,
+            simulator_type=SimulatorType.ACROBOT,
             simulator_params=my_simulator_parameters,
             noise=my_stds_for_simulation,
             initial_conditions=my_initial_conditions,
@@ -89,12 +89,14 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
                 offline_planning=OfflinePlanningConfig(
                     num_independent_runs=4,
                     exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA_TIME,
+                    exploration_norm=Norm.L_INF,
+                    numerical_method=NumericalComputation.LGL,
                     num_nodes=1000,
                     beta_exploration=BetaType.GP
                 ),
                 initial_control=initial_control,
             ),
-            angles_dim=[0, 2],
+            angles_dim=[0, 1],
             measurement_collector=MeasurementCollectionConfig(
                 batch_size_per_time_horizon=num_observation_points,
                 batch_strategy=measurement_selection_strategy,
@@ -137,7 +139,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
             )
 
     model = LearnSystem(run_config)
-    model.run_episodes(num_episodes=40, num_iter_training=8000)
+    model.run_episodes(num_episodes=30, num_iter_training=8000)
     wandb.finish()
 
 
