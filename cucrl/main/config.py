@@ -1,4 +1,4 @@
-from typing import NamedTuple, Dict, List, Union, Callable, Tuple
+from typing import NamedTuple, Dict, List, Callable, Tuple
 
 import jax
 from jax import random, numpy as jnp
@@ -6,8 +6,8 @@ from jax import random, numpy as jnp
 from cucrl.schedules.betas import BetasType
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.representatives import BetaType, BNNTypes, BatchStrategy
-from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, NumericalComputation, TimeHorizonType
-from cucrl.utils.representatives import SmootherType, ExplorationStrategy, Norm, DynamicsTracking, MinimizationMethod
+from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, TimeHorizonType
+from cucrl.utils.representatives import SmootherType, ExplorationStrategy, DynamicsTracking, MinimizationMethod
 
 
 class Scaling(NamedTuple):
@@ -26,7 +26,7 @@ class TerminationConfig(NamedTuple):
     max_state: jnp.ndarray | None = None
 
 
-class Simulator(NamedTuple):
+class SimulatorConfig(NamedTuple):
     scaling: Scaling
     simulator_type: SimulatorType
     simulator_params: Dict
@@ -47,7 +47,7 @@ class DataCollection(NamedTuple):
 class DataGeneratorConfig(NamedTuple):
     control_dim: int
     state_dim: int
-    simulator: Simulator
+    simulator: SimulatorConfig
     data_collection: DataCollection
 
 
@@ -77,8 +77,6 @@ class DynamicsConfig(NamedTuple):
 class OfflinePlanningConfig(NamedTuple):
     num_independent_runs: int = 3
     exploration_strategy: ExplorationStrategy = ExplorationStrategy.MEAN
-    exploration_norm: Norm = Norm.L_INF
-    numerical_method: NumericalComputation = NumericalComputation.SPLINES
     beta_exploration: BetaType = BetaType.GP
     minimization_method: MinimizationMethod = MinimizationMethod.ILQR_WITH_CEM
 
@@ -105,7 +103,6 @@ class MeasurementCollectionConfig(NamedTuple):
     batch_size_per_time_horizon: int = 3
     noise_std: float = 0.1
     time_horizon: TimeHorizonConfig = TimeHorizonConfig()
-    num_hallucination_nodes: int = 20
     num_interpolated_values: int = 100
     batch_strategy: BatchStrategy = BatchStrategy.MAX_KERNEL_DISTANCE_GREEDY
 
@@ -115,7 +112,7 @@ class PolicyConfig(NamedTuple):
     online_tracking: OnlineTrackingConfig = OnlineTrackingConfig()
     num_nodes: int = 100
     num_int_step_between_nodes: int = 10
-    initial_control: Union[float, jnp.ndarray, Callable] = 0.0
+    initial_control: float | jnp.ndarray | Callable = 0.0
 
 
 class InteractionConfig(NamedTuple):

@@ -11,11 +11,11 @@ from cucrl.utils.representatives import ExplorationStrategy, NumericalComputatio
 
 
 class AbstractOnlineTracker(AbstractTrajectoryOptimization):
-    def __init__(self, state_dim: int, control_dim: int, num_nodes: int, time_horizon: Tuple[float, float],
+    def __init__(self, x_dim: int, u_dim: int, num_nodes: int, time_horizon: Tuple[float, float],
                  dynamics: AbstractDynamics, simulator_costs: SimulatorCostsAndConstraints,
                  numerical_method=NumericalComputation.LGL, minimize_method='IPOPT',
                  exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA):
-        super().__init__(state_dim=state_dim, control_dim=control_dim, num_nodes=num_nodes, time_horizon=time_horizon,
+        super().__init__(x_dim=x_dim, u_dim=u_dim, num_nodes=num_nodes, time_horizon=time_horizon,
                          dynamics=dynamics, simulator_costs=simulator_costs, numerical_method=numerical_method,
                          minimize_method=minimize_method, exploration_strategy=exploration_strategy)
         pass

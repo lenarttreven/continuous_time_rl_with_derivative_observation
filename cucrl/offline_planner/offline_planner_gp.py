@@ -16,27 +16,27 @@ from cucrl.utils.representatives import ExplorationStrategy, NumericalComputatio
 
 
 class GPOfflinePlanner(AbstractTrajectoryOptimization):
-    def __init__(self, state_dim: int, control_dim: int, num_nodes: int, time_horizon: Tuple[float, float],
+    def __init__(self, x_dim: int, u_dim: int, num_nodes: int, time_horizon: Tuple[float, float],
                  dynamics: AbstractDynamics, simulator_costs: SimulatorCostsAndConstraints,
                  numerical_method=NumericalComputation.LGL, minimize_method='IPOPT', alpha=0.95,
                  exploration_norm: Norm = Norm.L_INF, exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA):
-        super().__init__(state_dim=state_dim, control_dim=control_dim, num_nodes=num_nodes, time_horizon=time_horizon,
+        super().__init__(x_dim=x_dim, u_dim=u_dim, num_nodes=num_nodes, time_horizon=time_horizon,
                          dynamics=dynamics, simulator_costs=simulator_costs, numerical_method=numerical_method,
                          minimize_method=minimize_method, exploration_strategy=exploration_strategy)
 
-        self.eta_place_holder = jnp.ones(shape=(self.num_nodes, self.state_dim))
-        self.num_traj_params = (self.state_dim + self.control_dim) * self.num_nodes
+        self.eta_place_holder = jnp.ones(shape=(self.num_nodes, self.x_dim))
+        self.num_traj_params = (self.x_dim + self.u_dim) * self.num_nodes
         self.example_OCSolution = OCSolution(times=self.time,
-                                             xs=jnp.ones(shape=(self.num_nodes, self.state_dim)),
-                                             us=jnp.ones(shape=(self.num_nodes, self.control_dim)),
+                                             xs=jnp.ones(shape=(self.num_nodes, self.x_dim)),
+                                             us=jnp.ones(shape=(self.num_nodes, self.u_dim)),
                                              params=jnp.ones(shape=(self.num_traj_params,)),
                                              opt_value=jnp.ones(shape=()),
-                                             eta=jnp.ones(shape=(self.num_nodes, self.state_dim)),
+                                             eta=jnp.ones(shape=(self.num_nodes, self.x_dim)),
                                              dynamics_idx=jnp.ones(shape=(), dtype=jnp.uint32),
                                              dynamics_key=jnp.ones(shape=(2,), dtype=jnp.uint32)
                                              )
 
-        self.num_total_params = (self.state_dim + self.state_dim + self.control_dim) * self.num_nodes
+        self.num_total_params = (self.x_dim + self.x_dim + self.u_dim) * self.num_nodes
         self.alpha = alpha
 
         self.rfq, self.gp_func = self.prepare_rfq()
@@ -82,25 +82,25 @@ class GPOfflinePlanner(AbstractTrajectoryOptimization):
             return jnp.exp(-jnp.sum((x - y) ** 2) / (2 * h))
 
         def mean(x):
-            return jnp.zeros(shape=(self.state_dim,))
+            return jnp.zeros(shape=(self.x_dim,))
 
-        rfq = RandomFunctionQuantile(dim_in=self.state_dim + self.control_dim, dim_out=self.state_dim,
+        rfq = RandomFunctionQuantile(dim_in=self.x_dim + self.u_dim, dim_out=self.x_dim,
                                      mu=mean, k=kernel, quantile=self.alpha, outer_dim_norm=Norm.L_INF)
-        gp_fun = GPFunc(dim_in=self.state_dim + self.control_dim, dim_out=self.state_dim, mean=mean, kernel=kernel)
+        gp_fun = GPFunc(dim_in=self.x_dim + self.u_dim, dim_out=self.x_dim, mean=mean, kernel=kernel)
         return rfq, gp_fun
 
     def get_eta(self, parameters):
-        reshaped_eta = parameters[:self.state_dim * self.num_nodes]
-        return reshaped_eta.reshape(self.num_nodes, self.state_dim)
+        reshaped_eta = parameters[:self.x_dim * self.num_nodes]
+        return reshaped_eta.reshape(self.num_nodes, self.x_dim)
 
     def get_params_without_eta(self, parameters):
-        return parameters[self.state_dim * self.num_nodes:]
+        return parameters[self.x_dim * self.num_nodes:]
 
     def get_states_and_controls(self, parameters):
-        reshaped_parameters = parameters[self.state_dim * self.num_nodes:].reshape(self.num_nodes,
-                                                                                   self.state_dim + self.control_dim)
-        states = reshaped_parameters[:, :self.state_dim]
-        actions = reshaped_parameters[:, self.state_dim:]
+        reshaped_parameters = parameters[self.x_dim * self.num_nodes:].reshape(self.num_nodes,
+                                                                               self.x_dim + self.u_dim)
+        states = reshaped_parameters[:, :self.x_dim]
+        actions = reshaped_parameters[:, self.x_dim:]
         return states, actions
 
     @staticmethod
@@ -175,7 +175,7 @@ class GPOfflinePlanner(AbstractTrajectoryOptimization):
         jax.debug.breakpoint()
         self.solver.update_args(dynamics_parameters, model_states, dynamics_key, initial_conditions,
                                 params_for_opt, data_stats,
-                                params_for_opt[:self.state_dim * self.num_nodes])
+                                params_for_opt[:self.x_dim * self.num_nodes])
         nlp = cyipopt.Problem(
             n=self.solver.params_for_opt.size,
             m=self.solver.cl.size,
@@ -210,7 +210,7 @@ class GPOfflinePlanner(AbstractTrajectoryOptimization):
         if initial_parameters.use_eta:
             raise NotImplementedError("This type of exploration is not supported")
         else:
-            eta = random.normal(key=initial_parameters.eta_key, shape=(self.num_nodes * self.state_dim,))
+            eta = random.normal(key=initial_parameters.eta_key, shape=(self.num_nodes * self.x_dim,))
             params_for_opt = jnp.concatenate([eta, initial_parameters.xs_and_us_params])
             return self._solve(dynamics_parameters, model_states, dynamics_key, initial_conditions,
                                params_for_opt, data_stats)

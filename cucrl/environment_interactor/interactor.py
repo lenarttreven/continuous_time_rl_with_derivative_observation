@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Tuple
 
-import jax
-import jax.numpy as jnp
+import chex
 from jax import random
 from jax.tree_util import register_pytree_node_class
 
@@ -11,13 +10,14 @@ from cucrl.environment_interactor.measurements_collector.measurements_collector 
 from cucrl.environment_interactor.policy.mpc_tracking import MPCTracking
 from cucrl.main.config import InteractionConfig, Scaling
 from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanner
-from cucrl.utils.classes import DynamicsModel, IntegrationCarry
+from cucrl.utils.classes import DynamicsModel, IntegrationCarry, MeasurementSelection
 from cucrl.utils.helper_functions import AngleLayerDynamics
 
 pytree = Any
 
 # Interaction is the output of the interactor and represents: [u, proposed_ts, events]
-Interaction = Tuple[jax.Array, jax.Array, IntegrationCarry]
+u_type = chex.Array
+Interaction = Tuple[u_type, MeasurementSelection, IntegrationCarry]
 
 
 class Interactor(ABC):
@@ -26,20 +26,19 @@ class Interactor(ABC):
         pass
 
     @abstractmethod
-    def interact(self, x: jnp.ndarray, t: jnp.ndarray, traj_idx, events) -> Interaction:
+    def interact(self, x: chex.Array, t: chex.Array, traj_idx, events) -> Interaction:
         pass
 
 
 @register_pytree_node_class
 class MPCInteractor(Interactor):
-    def __init__(self, state_dim, control_dim, dynamics: AbstractDynamics, initial_conditions, normalizer,
-                 angle_layer: AngleLayerDynamics, interaction_config: InteractionConfig,
-                 offline_planner: AbstractOfflinePlanner, scaling: Scaling):
-        self.policy = MPCTracking(state_dim, control_dim, dynamics, initial_conditions, normalizer, angle_layer,
+    def __init__(self, x_dim, u_dim, dynamics: AbstractDynamics, x0s, normalizer, angle_layer: AngleLayerDynamics,
+                 interaction_config: InteractionConfig, offline_planner: AbstractOfflinePlanner, scaling: Scaling):
+        self.policy = MPCTracking(x_dim, u_dim, dynamics, x0s, normalizer, angle_layer,
                                   interaction_config, offline_planner, scaling)
 
-        self.measurements_collector = MeasurementsCollector(state_dim, control_dim, dynamics, interaction_config,
-                                                            offline_planner, scaling, len(initial_conditions))
+        self.measurements_collector = MeasurementsCollector(x_dim, u_dim, dynamics, interaction_config,
+                                                            offline_planner, scaling, len(x0s))
 
         self.dynamics_model = DynamicsModel()
         self.tracking_data = None
@@ -58,8 +57,8 @@ class MPCInteractor(Interactor):
     @classmethod
     def tree_unflatten(cls, aux_data, children):
         dynamics_model, tracking_data, key, integration_carry, offline_planning_data = children
-        new_class = cls(state_dim=aux_data['state_dim'], control_dim=aux_data['control_dim'],
-                        dynamics=aux_data['dynamics'], initial_conditions=aux_data['initial_conditions'],
+        new_class = cls(x_dim=aux_data['state_dim'], u_dim=aux_data['control_dim'],
+                        dynamics=aux_data['dynamics'], x0s=aux_data['initial_conditions'],
                         normalizer=aux_data['normalizer'], angle_layer=aux_data['angle_layer'],
                         interaction_config=aux_data['interaction_config'], offline_planner=aux_data['offline_planner'],
                         scaling=aux_data['scaling'])
@@ -79,7 +78,7 @@ class MPCInteractor(Interactor):
         self.tracking_data = tracking_data
         self.dynamics_model = dynamics_model
 
-    def interact(self, x: jnp.ndarray, t: jnp.ndarray, traj_idx, events) -> Interaction:
+    def interact(self, x: chex.Array, t: chex.Array, traj_idx, events) -> Interaction:
         u, new_events = self.policy.apply(x, t, self.tracking_data, self.dynamics_model, traj_idx, events)
         measurement_selection, new_events = self.measurements_collector.apply(x, t, self.tracking_data,
                                                                               self.dynamics_model, traj_idx, new_events)

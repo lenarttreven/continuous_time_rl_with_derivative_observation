@@ -17,7 +17,7 @@ class MPCTracker:
         self.angle_normalizer = AngleNormalizer(state_dim=state_dim, control_dim=control_dim, angles_dim=angles_dim,
                                                 state_scaling=scaling.state_scaling)
 
-        self.mpc_tracker = ILQROnlineTracking(state_dim=state_dim, control_dim=control_dim,
+        self.mpc_tracker = ILQROnlineTracking(x_dim=state_dim, u_dim=control_dim,
                                               num_nodes=online_tracking_config.num_nodes,
                                               time_horizon=(0, online_tracking_config.time_horizon), dynamics=dynamics,
                                               simulator_costs=simulator_costs,

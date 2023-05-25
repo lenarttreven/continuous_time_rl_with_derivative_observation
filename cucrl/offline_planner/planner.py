@@ -18,7 +18,7 @@ class Planner:
     def __init__(self, offline_planner: AbstractOfflinePlanner, interaction_config: InteractionConfig):
         self.offline_planner = offline_planner
         self.interaction_config = interaction_config
-        total_dim = self.offline_planner.state_dim + self.offline_planner.control_dim
+        total_dim = self.offline_planner.x_dim + self.offline_planner.u_dim
         self.num_params = total_dim * self.offline_planner.num_nodes
 
         self.plan = jit(self.prepare_plan(self.solve))

@@ -8,7 +8,7 @@ import wandb
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
-from cucrl.main.config import RunConfig, DataGeneratorConfig, DynamicsConfig, InteractionConfig, Simulator, \
+from cucrl.main.config import RunConfig, DataGeneratorConfig, DynamicsConfig, InteractionConfig, SimulatorConfig, \
     DataCollection
 from cucrl.main.learn_system import LearnSystem
 from cucrl.schedules.learning_rate import LearningRateType
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         data_generator=DataGeneratorConfig(
             control_dim=action_dim,
             state_dim=state_dim,
-            simulator=Simulator(
+            simulator=SimulatorConfig(
                 scaling=Scaling(state_scaling=jnp.diag(jnp.array([1.0, 2.0])),
                                 control_scaling=jnp.eye(action_dim),
                                 time_scaling=jnp.ones(shape=(1,))),
@@ -100,7 +100,6 @@ if __name__ == '__main__':
                 offline_planning=OfflinePlanningConfig(
                     num_independent_runs=4,
                     exploration_strategy=ExplorationStrategy.MEAN,
-                    exploration_norm=Norm.L_INF,
                     beta_exploration=BetaType.GP
                 ),
                 initial_control=initial_control,
@@ -111,7 +110,6 @@ if __name__ == '__main__':
                 batch_strategy=BatchStrategy.MAX_DETERMINANT_GREEDY,
                 noise_std=0.0,
                 time_horizon=TimeHorizonConfig(type=TimeHorizonType.FIXED, init_horizon=10.0),
-                num_hallucination_nodes=100,
                 num_interpolated_values=1000,
             )
         ),

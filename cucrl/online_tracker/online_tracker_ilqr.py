@@ -25,15 +25,15 @@ class CostILQR(NamedTuple):
 
 
 class ILQROnlineTracking(AbstractOnlineTracker):
-    def __init__(self, state_dim: int, control_dim: int, num_nodes: int, time_horizon: Tuple[float, float],
+    def __init__(self, x_dim: int, u_dim: int, num_nodes: int, time_horizon: Tuple[float, float],
                  dynamics: AbstractDynamics, simulator_costs: SimulatorCostsAndConstraints,
                  exploration_strategy=ExplorationStrategy.MEAN,
                  dynamics_tracking: DynamicsTracking = DynamicsTracking.MEAN):
-        super().__init__(state_dim=state_dim, control_dim=control_dim, num_nodes=num_nodes, time_horizon=time_horizon,
+        super().__init__(x_dim=x_dim, u_dim=u_dim, num_nodes=num_nodes, time_horizon=time_horizon,
                          dynamics=dynamics, simulator_costs=simulator_costs, numerical_method=NumericalComputation.LGL,
                          minimize_method='IPOPT', exploration_strategy=exploration_strategy)
         self.dynamics_tracking = dynamics_tracking
-        self.num_total_params = (self.state_dim + self.control_dim) * self.num_nodes
+        self.num_total_params = (self.x_dim + self.u_dim) * self.num_nodes
         self.h = (self.time_horizon[1] - self.time_horizon[0]) / (self.num_nodes - 1)
         self.time = jnp.linspace(self.time_horizon[0], self.time_horizon[1], self.num_nodes)
         self.ilqr = ILQR(self.total_cost, self.discrete_dynamics)
@@ -70,12 +70,12 @@ class ILQROnlineTracking(AbstractOnlineTracker):
         xs_track, us_track = self.prepare_tracking_data(tracking_data, t_start)
         dynamics_ilqr = DynamicsILQR(dynamics_model=dynamics_model, mpc_params=mpc_params, us_track=us_track)
         cost_ilqr = CostILQR(xs_track=xs_track)
-        u_guess = jnp.zeros((self.num_nodes - 1, self.control_dim))
+        u_guess = jnp.zeros((self.num_nodes - 1, self.u_dim))
         out = self.ilqr.solve(cost_ilqr, dynamics_ilqr, initial_conditions, u_guess, self.ilqr_hyperparams)
         ts = jnp.linspace(0, self.time_horizon[1], self.num_nodes)
         jax.debug.print("{x}", x=out[2])
         # xs, delta_us = out['optimal_trajectory']
         xs, delta_us = out[0], out[1]
         xs_o, us_o = vmap(tracking_data)((t_start + self.time).reshape(-1, 1))
-        delta_us = jnp.concatenate([delta_us, delta_us[-1].reshape(1, self.control_dim)])
+        delta_us = jnp.concatenate([delta_us, delta_us[-1].reshape(1, self.u_dim)])
         return OCSolution(ts, xs, us_o + delta_us, out[2], mpc_params.dynamics_id)

@@ -15,14 +15,14 @@ from cucrl.utils.representatives import ExplorationStrategy, NumericalComputatio
 
 
 class EtaOfflinePlanner(AbstractOfflinePlanner):
-    def __init__(self, state_dim: int, control_dim: int, num_nodes: int, time_horizon: Tuple[float, float],
+    def __init__(self, x_dim: int, u_dim: int, num_nodes: int, time_horizon: Tuple[float, float],
                  dynamics: AbstractDynamics, simulator_costs: SimulatorCostsAndConstraints,
                  numerical_method=NumericalComputation.LGL, minimize_method='IPOPT',
                  exploration_norm: Norm = Norm.L_INF, exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA):
-        super().__init__(state_dim=state_dim, control_dim=control_dim, num_nodes=num_nodes, time_horizon=time_horizon,
+        super().__init__(x_dim=x_dim, u_dim=u_dim, num_nodes=num_nodes, time_horizon=time_horizon,
                          dynamics=dynamics, simulator_costs=simulator_costs, numerical_method=numerical_method,
                          minimize_method=minimize_method, exploration_strategy=exploration_strategy)
-        self.num_total_params = self.state_dim + (self.state_dim + self.control_dim) * self.num_nodes
+        self.num_total_params = self.x_dim + (self.x_dim + self.u_dim) * self.num_nodes
         if exploration_strategy != ExplorationStrategy.OPTIMISTIC_ETA:
             raise NotImplementedError(
                 'For TrajectoryOptimizationEta only ExplorationStrategy.OPTIMISTIC_ETA strategy is implemented')
@@ -59,9 +59,9 @@ class EtaOfflinePlanner(AbstractOfflinePlanner):
             raise TypeError('This algorithm works only with ExplorationStrategy.OPTIMISTIC_ETA')
 
     def get_states_and_controls(self, parameters):
-        reshaped_parameters = parameters[self.state_dim:].reshape(self.num_nodes, self.state_dim + self.control_dim)
-        states = reshaped_parameters[:, :self.state_dim]
-        actions = reshaped_parameters[:, self.state_dim:]
+        reshaped_parameters = parameters[self.x_dim:].reshape(self.num_nodes, self.x_dim + self.u_dim)
+        states = reshaped_parameters[:, :self.x_dim]
+        actions = reshaped_parameters[:, self.x_dim:]
         return states, actions
 
     @staticmethod
@@ -91,7 +91,7 @@ class EtaOfflinePlanner(AbstractOfflinePlanner):
         @jit
         def equality(parameters, initial_conditions, dynamics_model: DynamicsModel):
             states, action = self.get_states_and_controls(parameters)
-            eta = parameters[:self.state_dim]
+            eta = parameters[:self.x_dim]
             initial_condition_constraint = states[0, :] - initial_conditions
             real_der_mean, real_der_std = vmap(self.system_dynamics, in_axes=(None, 0, 0))(dynamics_model, states,
                                                                                            action)
@@ -113,8 +113,8 @@ class EtaOfflinePlanner(AbstractOfflinePlanner):
     def prepare_inequality_constraints_eta(self):
         @jit
         def inequality(parameters, beta: jax.Array):
-            assert beta.shape == (self.state_dim,)
-            eta = parameters[:self.state_dim]
+            assert beta.shape == (self.x_dim,)
+            eta = parameters[:self.x_dim]
             return jnp.concatenate([eta + beta, beta - eta])
 
         return inequality
@@ -151,7 +151,7 @@ class EtaOfflinePlanner(AbstractOfflinePlanner):
         print(info['status_msg'])
         print(info['obj_val'])
         xs, us = self.get_states_and_controls(x)
-        eta = x[:self.state_dim]
+        eta = x[:self.x_dim]
         print(colored('Optimization variable eta {}'.format(eta), 'cyan'))
         dynamics_id = DynamicsIdentifier(key=jnp.ones(shape=(2,), dtype=jnp.uint32),
                                          idx=jnp.ones(shape=(), dtype=jnp.uint32), eta=eta)
@@ -159,6 +159,6 @@ class EtaOfflinePlanner(AbstractOfflinePlanner):
 
     def plan_offline(self, dynamics_model: DynamicsModel, initial_parameters: OfflinePlanningParams,
                      initial_conditions: jax.Array):
-        eta = random.normal(key=initial_parameters.key, shape=(self.state_dim,))
+        eta = random.normal(key=initial_parameters.key, shape=(self.x_dim,))
         params_for_opt = jnp.concatenate([eta, initial_parameters.xs_and_us_params])
         return pure_callback(self._solve, self.example_OCSolution, dynamics_model, initial_conditions, params_for_opt)

@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 
 from cucrl.environment_interactor.interactor import Interactor
-from cucrl.main.config import DataGenerationConfig
+from cucrl.main.config import DataGeneratorConfig
 from cucrl.simulator.ode_integrator import ForwardEuler
 from cucrl.utils.classes import MeasurementSelection, DynamicsData
 
@@ -40,24 +40,21 @@ class DataRepr(NamedTuple):
 
 
 class DataGenerator:
-    def __init__(self, data_generation: DataGenerationConfig, interactor: Interactor):
-        self.initial_conditions = data_generation.initial_conditions
-        self.num_visualization_points = data_generation.num_visualization_points
+    def __init__(self, data_generation: DataGeneratorConfig, interactor: Interactor):
+        self.initial_conditions = data_generation.data_collection.initial_conditions
+        self.num_visualization_points = data_generation.data_collection.num_visualization_points
         self.state_dim = self.initial_conditions[0].size
         self.control_dim = data_generation.control_dim
         self.stacked_initial_conditions = jnp.stack(self.initial_conditions)
 
         self.num_trajectories = len(self.initial_conditions)
-        self.time_horizon = data_generation.time_horizon
+        self.time_horizon = data_generation.simulator.time_horizon
         self.visualization_times_whole_horizon = jnp.linspace(*self.time_horizon,
                                                               self.num_visualization_points).reshape(-1, 1)
-        self.simulator_type = data_generation.simulator_type
-        self.simulator_parameters = data_generation.simulator_params
-        observation_noise = data_generation.noise
+        self.simulator_type = data_generation.simulator.simulator_type
+        observation_noise = data_generation.data_collection.noise
         self.simulation_noise = [None] if observation_noise is None else observation_noise
-        self.simulator = ForwardEuler(interactor=interactor, simulator_type=self.simulator_type,
-                                      scaling=data_generation.scaling, step_size=data_generation.simulator_step_size,
-                                      termination_config=data_generation.termination_config)
+        self.simulator = ForwardEuler(interactor=interactor, simulator=data_generation.simulator)
 
     def generate_trajectories(self, rng: jnp.array) -> Tuple[DataRepr, MeasurementSelection]:
         key, subkey = jax.random.split(rng)

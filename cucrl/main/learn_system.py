@@ -210,8 +210,8 @@ class LearnSystem:
         print("Time to prepare objective builder", time.time() - time_objective_builder)
 
     def _prepare_offline_planner(self):
-        offline_planer_config = self.interaction.policy.offline_planning
-        planner_class = get_offline_planner(offline_planer_config.exploration_strategy)
+        policy_config = self.interaction.policy
+        planner_class = get_offline_planner(policy_config.offline_planning.exploration_strategy)
         self.offline_planner = planner_class(
             state_dim=self.state_dim, control_dim=self.control_dim, num_nodes=offline_planer_config.num_nodes,
             numerical_method=offline_planer_config.numerical_method, time_horizon=self.time_horizon,

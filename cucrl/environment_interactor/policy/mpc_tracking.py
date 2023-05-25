@@ -1,6 +1,6 @@
 from typing import Any, Tuple
 
-import jax
+import chex
 import jax.numpy as jnp
 from jax import random
 from jax.lax import cond
@@ -18,7 +18,7 @@ from cucrl.utils.helper_functions import AngleLayerDynamics
 pytree = Any
 
 # PolicyOut is the output of the policy and represents: [us, events]
-PolicyOut = Tuple[jax.Array, IntegrationCarry]
+PolicyOut = Tuple[chex.Array, IntegrationCarry]
 
 
 class MPCTracking(Policy):
@@ -56,7 +56,7 @@ class MPCTracking(Policy):
                           self.no_update_mpc_for_cond, x, t, events, tracking_data, dynamics_model)
         return new_events.mpc_carry.true_policy(t.reshape()), new_events
 
-    def apply(self, x: jnp.ndarray, t: jnp.ndarray, tracking_data, dynamics_model, traj_idx, events) -> PolicyOut:
+    def apply(self, x: chex.Array, t: chex.Array, tracking_data, dynamics_model, traj_idx, events) -> PolicyOut:
         u, new_events = cond(dynamics_model.episode == 0, self.episode_zero, self.other_episode, x, t, events,
                              tree_map(lambda z: z[traj_idx], tracking_data), dynamics_model)
         return u, new_events
