@@ -16,7 +16,7 @@ from termcolor import colored
 
 from cucrl.dynamics_with_control.dynamics_models import get_dynamics
 from cucrl.environment_interactor.get_interactor import get_interactor
-from cucrl.main.config import RunConfig, DynamicsConfig, OptimizersConfig, DataGenerationConfig
+from cucrl.main.config import RunConfig, DynamicsConfig, OptimizersConfig, DataGeneratorConfig
 from cucrl.main.data_stats import DataLoader
 from cucrl.main.data_stats import DataStats, Normalizer, DataLearn, DynamicsData, Stats
 from cucrl.main.handlers import DataGenerator, DynamicsDataManager
@@ -42,11 +42,11 @@ class LearnSystem:
     def __init__(self, config: RunConfig):
         # Prepare dimensions
         self.config = config
-        self._prepare_dimensions(config.data_generation)
+        self._prepare_dimensions(config.data_generator)
 
         self.angle_layer = AngleLayerDynamics(state_dim=self.state_dim, control_dim=self.control_dim,
                                               angles_dim=config.interaction.angles_dim,
-                                              state_scaling=self.config.data_generation.scaling.state_scaling)
+                                              state_scaling=self.config.data_generator.simulator.scaling.state_scaling)
         self.normalizer = Normalizer(state_dim=self.state_dim, action_dim=self.control_dim,
                                      tracking_c=None, angle_layer=self.angle_layer)
         init_stats_state = Stats(jnp.zeros(shape=(self.state_dim,)), jnp.ones(shape=(self.state_dim,)))
@@ -60,8 +60,8 @@ class LearnSystem:
                                     xs_after_angle_layer=init_stats_after_angle_layer)
         # Prepare pool for vector field data
         self.vector_field_data = DynamicsDataManager(self.state_dim, self.control_dim)
-        self.simulator_costs = get_simulator_costs(config.data_generation.simulator_type,
-                                                   scaling=self.config.data_generation.scaling)
+        self.simulator_costs = get_simulator_costs(config.data_generator.simulator.simulator_type,
+                                                   scaling=self.config.data_generator.simulator.scaling)
 
         # Prepare randomness
         self.current_rng = jax.random.PRNGKey(config.seed)
@@ -79,9 +79,9 @@ class LearnSystem:
         # Prepare trajectory optimization
         self._prepare_offline_planner()
         # Prepare feedback controller
-        self._prepare_controller(self.interaction, config.data_generation.initial_conditions)
+        self._prepare_controller(self.interaction, config.data_generator.data_collection.initial_conditions)
         # Prepare data generator
-        self.data_generator = DataGenerator(data_generation=config.data_generation, interactor=self.policy)
+        self.data_generator = DataGenerator(data_generation=config.data_generator, interactor=self.policy)
         # Initialize parameters
         self._initialize_parameters()
         # Prepare plotter
@@ -102,7 +102,7 @@ class LearnSystem:
         best_possible_discrete = BestPossibleDiscreteAlgorithm(
             simulator_dynamics=self.data_generator.simulator.simulator_dynamics,
             simulator_costs=self.simulator_costs,
-            time_horizon=self.config.data_generation.time_horizon,
+            time_horizon=self.config.data_generator.simulator.time_horizon,
             num_nodes=self.config.comparator.num_discrete_points)
         self.best_possible_discrete_cost = [best_possible_discrete.get_optimal_cost(ic) for ic in
                                             self.data_generator.initial_conditions]
@@ -110,14 +110,13 @@ class LearnSystem:
         self.optimal_cost = self.compute_optimal_cost(self.interaction, self.data_generator.initial_conditions)
         self.dynamics_model = None
 
-    def _prepare_dimensions(self, data_generation: DataGenerationConfig):
-        self.data_generation_key = data_generation.data_generation_key
+    def _prepare_dimensions(self, data_generation: DataGeneratorConfig):
+        self.data_generation_key = data_generation.data_collection.data_generation_key
         self.control_dim = data_generation.control_dim
         self.state_dim = data_generation.state_dim
-        self.num_trajectories = len(data_generation.initial_conditions)
-        self.num_obs_per_episode = sum(map(len, data_generation.initial_conditions))
-        self.time_horizon = data_generation.time_horizon
-        self.noise_stds = data_generation.noise
+        self.num_trajectories = len(data_generation.data_collection.initial_conditions)
+        self.time_horizon = data_generation.simulator.time_horizon
+        self.noise_stds = data_generation.data_collection.noise
 
     def _prepare_dynamics(self, dynamics: DynamicsConfig):
         time_dynamics = time.time()
@@ -132,7 +131,7 @@ class LearnSystem:
         self.policy = get_interactor(self.state_dim, self.control_dim, self.dynamics, initial_condition,
                                      self.normalizer,
                                      self.angle_layer, control_options, self.offline_planner,
-                                     self.config.data_generation.scaling)
+                                     self.config.data_generator.simulator.scaling)
 
     def compute_optimal_cost(self, control_options, initial_condition):
         offline_planer_config = self.interaction.policy.offline_planning
@@ -151,9 +150,9 @@ class LearnSystem:
         true_policy = get_interactor(self.state_dim, self.control_dim, true_dynamics_wrapper, initial_condition,
                                      self.normalizer,
                                      self.angle_layer, control_options, offline_planner,
-                                     self.config.data_generation.scaling)
+                                     self.config.data_generator.simulator.scaling)
 
-        true_data_gen = DataGenerator(data_generation=self.config.data_generation, interactor=true_policy)
+        true_data_gen = DataGenerator(data_generation=self.config.data_generator, interactor=true_policy)
 
         dynamics_model = DynamicsModel(params=self.parameters['dynamics'], model_stats=self.stats['dynamics'],
                                        data_stats=self.data_stats, episode=1,
@@ -418,7 +417,7 @@ class LearnSystem:
             data, measurement_selection = self.generate_data()
             # Add data to permanent pool
             xs_dot_noise = jnp.concatenate(data.observation_data.xs_dot_noise)
-            xs_dot_std = self.config.data_generation.noise * jnp.ones_like(xs_dot_noise)
+            xs_dot_std = self.config.data_generator.data_collection.noise * jnp.ones_like(xs_dot_noise)
 
             current_dynamics_data = DynamicsData(ts=jnp.concatenate(data.observation_data.ts),
                                                  xs=jnp.concatenate(data.observation_data.xs),

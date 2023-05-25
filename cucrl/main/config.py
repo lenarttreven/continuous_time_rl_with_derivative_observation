@@ -26,20 +26,29 @@ class TerminationConfig(NamedTuple):
     max_state: jnp.ndarray | None = None
 
 
-class DataGenerationConfig(NamedTuple):
+class Simulator(NamedTuple):
     scaling: Scaling
-    data_generation_key: random.PRNGKeyArray
-    simulator_step_size: float
     simulator_type: SimulatorType
     simulator_params: Dict
+    num_nodes: int
+    num_int_step_between_nodes: int
+    time_horizon: Tuple[float, float]
+    termination_config: TerminationConfig = TerminationConfig()
+
+
+class DataCollection(NamedTuple):
+    data_generation_key: random.PRNGKeyArray
     noise: jnp.ndarray
     initial_conditions: List[jnp.ndarray]
-    time_horizon: Tuple[float, float]
     num_matching_points: int
     num_visualization_points: int
+
+
+class DataGeneratorConfig(NamedTuple):
     control_dim: int
     state_dim: int
-    termination_config: TerminationConfig = TerminationConfig()
+    simulator: Simulator
+    data_collection: DataCollection
 
 
 class LearningRate(NamedTuple):
@@ -71,14 +80,12 @@ class OfflinePlanningConfig(NamedTuple):
     exploration_norm: Norm = Norm.L_INF
     numerical_method: NumericalComputation = NumericalComputation.SPLINES
     beta_exploration: BetaType = BetaType.GP
-    num_nodes: int = 30
     minimization_method: MinimizationMethod = MinimizationMethod.ILQR_WITH_CEM
 
 
 class OnlineTrackingConfig(NamedTuple):
-    mpc_dt: float = 0.02
+    mpc_update_period: int = 1
     time_horizon: float = 2.0
-    num_nodes: int = 10
     dynamics_tracking: DynamicsTracking = DynamicsTracking.MEAN
 
 
@@ -106,6 +113,8 @@ class MeasurementCollectionConfig(NamedTuple):
 class PolicyConfig(NamedTuple):
     offline_planning: OfflinePlanningConfig = OfflinePlanningConfig()
     online_tracking: OnlineTrackingConfig = OnlineTrackingConfig()
+    num_nodes: int = 100
+    num_int_step_between_nodes: int = 10
     initial_control: Union[float, jnp.ndarray, Callable] = 0.0
 
 
@@ -146,10 +155,9 @@ class ComparatorConfig(NamedTuple):
 
 class RunConfig(NamedTuple):
     seed: int
-    data_generation: DataGenerationConfig
+    data_generator: DataGeneratorConfig
     dynamics: DynamicsConfig
     interaction: InteractionConfig
-    betas: BetasConfig
     optimizers: OptimizersConfig
     logging: LoggingConfig
     comparator: ComparatorConfig

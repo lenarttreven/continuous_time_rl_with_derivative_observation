@@ -2,16 +2,15 @@ import argparse
 import os
 
 import jax.numpy as jnp
-import jax.random
 from jax.config import config
 
 import wandb
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig
-from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
+from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
-from cucrl.main.config import RunConfig, DataGenerationConfig, DynamicsConfig, InteractionConfig
+from cucrl.main.config import RunConfig, DataGeneratorConfig, DynamicsConfig, InteractionConfig, Simulator, \
+    DataCollection
 from cucrl.main.learn_system import LearnSystem
-from cucrl.schedules.betas import BetasType
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.helper_functions import namedtuple_to_dict
 from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, BNNTypes
@@ -55,25 +54,30 @@ if __name__ == '__main__':
 
     run_config = RunConfig(
         seed=seed,
-        data_generation=DataGenerationConfig(
-            scaling=Scaling(state_scaling=jnp.diag(jnp.array([1.0, 2.0])),
-                            control_scaling=jnp.eye(action_dim),
-                            time_scaling=jnp.ones(shape=(1,))),
-            data_generation_key=jax.random.PRNGKey(data_generation_seed),
-            simulator_step_size=0.001,
-            simulator_type=SimulatorType.PENDULUM,
-            simulator_params=simulator_parameters,
-            noise=stds_for_simulation,
-            initial_conditions=initial_conditions,
-            time_horizon=time_horizon,
-            num_matching_points=num_matching_points,
-            num_visualization_points=num_visualization_points,
+        data_generator=DataGeneratorConfig(
             control_dim=action_dim,
             state_dim=state_dim,
-            termination_config=TerminationConfig(episode_budget_running_cost=1500.0,
-                                                 limited_budget=False,
-                                                 max_state=100 * jnp.ones(shape=(state_dim,))),
+            simulator=Simulator(
+                scaling=Scaling(state_scaling=jnp.diag(jnp.array([1.0, 2.0])),
+                                control_scaling=jnp.eye(action_dim),
+                                time_scaling=jnp.ones(shape=(1,))),
+                simulator_type=SimulatorType.PENDULUM,
+                simulator_params=simulator_parameters,
+                num_nodes=100,
+                num_int_step_between_nodes=10,
+                time_horizon=time_horizon,
+                termination_config=TerminationConfig(episode_budget_running_cost=1500.0,
+                                                     limited_budget=False,
+                                                     max_state=100 * jnp.ones(shape=(state_dim,))),
 
+            ),
+            data_collection=DataCollection(
+                data_generation_key=data_generation_seed,
+                initial_conditions=initial_conditions,
+                num_matching_points=num_matching_points,
+                num_visualization_points=num_visualization_points,
+                noise=stds_for_simulation,
+            ),
         ),
         dynamics=DynamicsConfig(
             type=Dynamics.GP,
@@ -86,17 +90,17 @@ if __name__ == '__main__':
         interaction=InteractionConfig(
             time_horizon=time_horizon,
             policy=PolicyConfig(
+                num_nodes=100,
+                num_int_step_between_nodes=10,
                 online_tracking=OnlineTrackingConfig(
-                    mpc_dt=0.02,
+                    mpc_update_period=1,
                     time_horizon=5.0,
-                    num_nodes=50,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(
                     num_independent_runs=4,
                     exploration_strategy=ExplorationStrategy.MEAN,
                     exploration_norm=Norm.L_INF,
-                    num_nodes=100,
                     beta_exploration=BetaType.GP
                 ),
                 initial_control=initial_control,
@@ -111,7 +115,6 @@ if __name__ == '__main__':
                 num_interpolated_values=1000,
             )
         ),
-        betas=BetasConfig(type=BetasType.CONSTANT, kwargs={'value': beta, 'num_dim': state_dim}),
         optimizers=OptimizersConfig(
             no_batching=True,
             batch_size=BatchSize(dynamics=64),
