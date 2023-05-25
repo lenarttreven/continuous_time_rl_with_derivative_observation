@@ -74,19 +74,6 @@ class DynamicsConfig(NamedTuple):
     bnn_type: BNNTypes = BNNTypes.DETERMINISTIC_ENSEMBLE
 
 
-class OfflinePlanningConfig(NamedTuple):
-    num_independent_runs: int = 3
-    exploration_strategy: ExplorationStrategy = ExplorationStrategy.MEAN
-    beta_exploration: BetaType = BetaType.GP
-    minimization_method: MinimizationMethod = MinimizationMethod.ILQR_WITH_CEM
-
-
-class OnlineTrackingConfig(NamedTuple):
-    mpc_update_period: int = 1
-    time_horizon: float = 2.0
-    dynamics_tracking: DynamicsTracking = DynamicsTracking.MEAN
-
-
 class SystemAssumptions(NamedTuple):
     l_f: jax.Array = jnp.array(1.0)
     l_pi: jax.Array = jnp.array(1.0)
@@ -105,6 +92,19 @@ class MeasurementCollectionConfig(NamedTuple):
     time_horizon: TimeHorizonConfig = TimeHorizonConfig()
     num_interpolated_values: int = 100
     batch_strategy: BatchStrategy = BatchStrategy.MAX_KERNEL_DISTANCE_GREEDY
+
+
+class OfflinePlanningConfig(NamedTuple):
+    num_independent_runs: int = 3
+    exploration_strategy: ExplorationStrategy = ExplorationStrategy.MEAN
+    beta_exploration: BetaType = BetaType.GP
+    minimization_method: MinimizationMethod = MinimizationMethod.ILQR_WITH_CEM
+
+
+class OnlineTrackingConfig(NamedTuple):
+    mpc_update_period: int = 1
+    time_horizon: float = 2.0
+    dynamics_tracking: DynamicsTracking = DynamicsTracking.MEAN
 
 
 class PolicyConfig(NamedTuple):

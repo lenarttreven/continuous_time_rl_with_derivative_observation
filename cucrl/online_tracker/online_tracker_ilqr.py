@@ -1,81 +1,131 @@
-from functools import partial
-from typing import Tuple, NamedTuple
+from typing import NamedTuple, Tuple
 
+import chex
 import jax
 import jax.numpy as jnp
-from jax import jit, vmap
+from jax import vmap
 from jax.lax import cond
 from trajax.optimizers import ILQR, ILQRHyperparams
 
 from cucrl.dynamics_with_control.dynamics_models import AbstractDynamics
+from cucrl.main.config import InteractionConfig
 from cucrl.online_tracker.abstract_online_tracker import AbstractOnlineTracker
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
-from cucrl.utils.classes import OCSolution, TrackingData, MPCParameters, DynamicsModel
-from cucrl.utils.representatives import ExplorationStrategy, NumericalComputation, DynamicsTracking
+from cucrl.utils.classes import OCSolution, TrackingData, MPCParameters, DynamicsModel, DynamicsIdentifier
+from cucrl.utils.representatives import DynamicsTracking
 
 
 class DynamicsILQR(NamedTuple):
     dynamics_model: DynamicsModel
     mpc_params: MPCParameters
     us_track: TrackingData
+    ts_track: chex.Array
 
 
 class CostILQR(NamedTuple):
-    xs_track: jax.Array
+    xs_track: chex.Array
+    ts_track: chex.Array
+    dynamics_model: DynamicsModel
 
 
 class ILQROnlineTracking(AbstractOnlineTracker):
-    def __init__(self, x_dim: int, u_dim: int, num_nodes: int, time_horizon: Tuple[float, float],
-                 dynamics: AbstractDynamics, simulator_costs: SimulatorCostsAndConstraints,
-                 exploration_strategy=ExplorationStrategy.MEAN,
-                 dynamics_tracking: DynamicsTracking = DynamicsTracking.MEAN):
-        super().__init__(x_dim=x_dim, u_dim=u_dim, num_nodes=num_nodes, time_horizon=time_horizon,
-                         dynamics=dynamics, simulator_costs=simulator_costs, numerical_method=NumericalComputation.LGL,
-                         minimize_method='IPOPT', exploration_strategy=exploration_strategy)
-        self.dynamics_tracking = dynamics_tracking
-        self.num_total_params = (self.x_dim + self.u_dim) * self.num_nodes
-        self.h = (self.time_horizon[1] - self.time_horizon[0]) / (self.num_nodes - 1)
-        self.time = jnp.linspace(self.time_horizon[0], self.time_horizon[1], self.num_nodes)
-        self.ilqr = ILQR(self.total_cost, self.discrete_dynamics)
+    def __init__(self, x_dim: int, u_dim: int, dynamics: AbstractDynamics,
+                 simulator_costs: SimulatorCostsAndConstraints, interaction_config: InteractionConfig, ):
+        super().__init__(x_dim=x_dim, u_dim=u_dim, time_horizon=interaction_config.time_horizon, dynamics=dynamics,
+                         simulator_costs=simulator_costs)
+        self.interaction_config = interaction_config
+        # Setup time
+        ts_nodes = jnp.linspace(*interaction_config.time_horizon, interaction_config.policy.num_nodes + 1)
+        policy_config = interaction_config.policy
+        self.num_nodes = jnp.sum(ts_nodes <= policy_config.online_tracking.time_horizon)
+        self.ts = ts_nodes[:self.num_nodes]
+        self.all_ts = ts_nodes
+        self.between_control_ts = jnp.linspace(self.all_ts[0], self.all_ts[1], policy_config.num_int_step_between_nodes)
+
+        policy_config = interaction_config.policy
+        total_time = interaction_config.time_horizon[1] - interaction_config.time_horizon[0]
+        total_int_steps = policy_config.num_nodes * policy_config.num_int_step_between_nodes
+        self.dt = total_time / total_int_steps
+
+        # Setup optimizer
+        self.ilqr = ILQR(self.cost_fn, self.dynamics_fn)
         self.ilqr_hyperparams = ILQRHyperparams(maxiter=100)
 
-    @partial(jit, static_argnums=0)
-    def ode(self, x, u, dynamics_ilqr: DynamicsILQR) -> jax.Array:
-        if self.dynamics_tracking == DynamicsTracking.MEAN:
-            x_dot_mean = self.dynamics.mean_eval_one(dynamics_ilqr.dynamics_model, x, u)
+    def example_dynamics_id(self) -> DynamicsIdentifier:
+        return DynamicsIdentifier(eta=jnp.ones(shape=(self.num_nodes, self.x_dim)),
+                                  idx=jnp.ones(shape=(), dtype=jnp.int32),
+                                  key=jnp.ones(shape=(2,), dtype=jnp.int32))
+
+    def example_oc_solution(self) -> OCSolution:
+        return OCSolution(ts=self.ts, xs=jnp.ones(shape=(self.num_nodes, self.x_dim)),
+                          us=jnp.ones(shape=(self.num_nodes, self.u_dim)), opt_value=jnp.ones(shape=()),
+                          dynamics_id=self.example_dynamics_id())
+
+    def ode(self, x: chex.Array, u: chex.Array, dynamics_model: DynamicsModel) -> chex.Array:
+        if self.interaction_config.policy.online_tracking.dynamics_tracking == DynamicsTracking.MEAN:
+            x_dot_mean = self.dynamics.mean_eval_one(dynamics_model, x, u)
             return x_dot_mean
         else:
-            x_dot_mean, x_dot_std = self.dynamics.mean_and_std_eval_one(dynamics_ilqr.dynamics_model, x, u)
-            return x_dot_mean + x_dot_std * dynamics_ilqr.mpc_params.dynamics_id.eta
+            raise NotImplementedError(f"Unknown dynamics tracking: "
+                                      f"{self.interaction_config.policy.online_tracking.dynamics_tracking}")
 
-    def discrete_dynamics(self, x, u, k, dynamics_ilqr: DynamicsILQR):
-        return x + self.h * self.ode(x, u + dynamics_ilqr.us_track[k], dynamics_ilqr)
+    def dynamics_fn(self, x_k: chex.Array, u_k: chex.Array, k: chex.Array, dynamics_ilqr: DynamicsILQR):
+        # t will go over array [0, ..., num_nodes - 1]
+        assert x_k.shape == (self.x_dim,) and u_k.shape == (self.u_dim,) and k.shape == () and k.dtype == jnp.int32
+        # dynamics_ilqr.us_track is a (num_nodes - 1, u_dim) array
 
-    def running_cost(self, x, u, k, cost_ilqr: CostILQR):
-        return self.h * self.simulator_costs.tracking_running_cost(x - cost_ilqr.xs_track[k], u)
+        init_time = dynamics_ilqr.ts_track[k]
+        cur_ts = init_time + self.between_control_ts
 
-    def terminal_cost(self, x, u, k, cost_ilqr: CostILQR):
-        return self.h * self.simulator_costs.tracking_terminal_cost(x - cost_ilqr.xs_track[-1], jnp.zeros(
-            shape=(self.simulator_costs.control_dim,)))
+        def _next_step(x: chex.Array, t: chex.Array) -> Tuple[chex.Array, chex.Array]:
+            x_dot = self.ode(x, u_k + dynamics_ilqr.us_track[k], dynamics_ilqr.dynamics_model)
+            x_next = x + self.dt * x_dot
+            return x_next, x_next
 
-    def total_cost(self, x, u, k, cost_ilqr: CostILQR):
-        return cond(k == self.num_nodes - 1, self.terminal_cost, self.running_cost, x, u, k, cost_ilqr)
+        x_k_next, _ = jax.lax.scan(_next_step, x_k, cur_ts)
+        return x_k_next
+
+    def cost_fn(self, x_k, u_k, k, cost_ilqr: CostILQR):
+        assert x_k.shape == (self.x_dim,) and u_k.shape == self.u_dim and k.shape == () and k.dtype == jnp.int32
+
+        def running_cost(x, u, t):
+            init_time = cost_ilqr.ts_track[k]
+            cur_ts = init_time + self.between_control_ts
+
+            def _next_step(_x: chex.Array, _t: chex.Array) -> Tuple[chex.Array, chex.Array]:
+                x_dot = self.ode(_x, u, cost_ilqr.dynamics_model)
+                x_next = _x + self.dt * x_dot
+                return x_next, self.dt * self.simulator_costs.running_cost(_x, u)
+
+            x_last, cs = jax.lax.scan(_next_step, x, cur_ts)
+            assert cs.shape == (self.interaction_config.policy.num_int_step_between_nodes,)
+            return jnp.sum(cs)
+
+        def terminal_cost(x, u, t):
+            return self.simulator_costs.terminal_cost(x, u)
+
+        return cond(k == self.num_nodes - 1, terminal_cost, running_cost, x_k, u_k, k)
 
     def prepare_tracking_data(self, tracking_data: TrackingData, t_start):
-        ts_eval = self.time + t_start
-        return vmap(tracking_data)(ts_eval.reshape(-1, 1))
+        t_indices = t_start + jnp.arange(self.num_nodes - 1)
+        return vmap(tracking_data)(t_indices)
 
-    def track_online(self, dynamics_model: DynamicsModel, initial_conditions: jax.Array, mpc_params: MPCParameters,
-                     tracking_data: TrackingData, t_start) -> OCSolution:
-        xs_track, us_track = self.prepare_tracking_data(tracking_data, t_start)
-        dynamics_ilqr = DynamicsILQR(dynamics_model=dynamics_model, mpc_params=mpc_params, us_track=us_track)
-        cost_ilqr = CostILQR(xs_track=xs_track)
-        u_guess = jnp.zeros((self.num_nodes - 1, self.u_dim))
-        out = self.ilqr.solve(cost_ilqr, dynamics_ilqr, initial_conditions, u_guess, self.ilqr_hyperparams)
-        ts = jnp.linspace(0, self.time_horizon[1], self.num_nodes)
-        jax.debug.print("{x}", x=out[2])
-        # xs, delta_us = out['optimal_trajectory']
-        xs, delta_us = out[0], out[1]
-        xs_o, us_o = vmap(tracking_data)((t_start + self.time).reshape(-1, 1))
+    def track_online(self, dynamics_model: DynamicsModel, initial_conditions: chex.Array, mpc_params: MPCParameters,
+                     tracking_data: TrackingData, t_start_idx: chex.Array) -> OCSolution:
+        assert t_start_idx.shape == () and t_start_idx.dtype == jnp.int32
+        # xs_track, us_track are of shape (num_nodes, x_dim) and (num_nodes - 1, u_dim) respectively
+        xs_track, us_track, ts_track = self.prepare_tracking_data(tracking_data, t_start_idx)
+
+        dynamics_ilqr = DynamicsILQR(dynamics_model=dynamics_model, mpc_params=mpc_params, us_track=us_track,
+                                     ts_track=ts_track, )
+        cost_ilqr = CostILQR(xs_track=xs_track, ts_track=ts_track, dynamics_model=dynamics_model)
+
+        u_init = jnp.zeros((self.num_nodes - 1, self.u_dim))
+        results = self.ilqr.solve(cost_ilqr, dynamics_ilqr, initial_conditions, u_init, self.ilqr_hyperparams)
+
+        jax.debug.print("Objective value: {x}", x=results.obj)
+        xs, delta_us = results.xs, results.us
+
+        xs_o, us_o = xs_track, us_track
         delta_us = jnp.concatenate([delta_us, delta_us[-1].reshape(1, self.u_dim)])
-        return OCSolution(ts, xs, us_o + delta_us, out[2], mpc_params.dynamics_id)
+        return OCSolution(ts_track, xs, us_o + delta_us, results.obj, mpc_params.dynamics_id)

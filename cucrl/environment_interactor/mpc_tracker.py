@@ -1,7 +1,7 @@
-from typing import Any, List
+from typing import Any
 
 from cucrl.dynamics_with_control.dynamics_models import AbstractDynamics
-from cucrl.main.config import Scaling, OnlineTrackingConfig
+from cucrl.main.config import Scaling, InteractionConfig
 from cucrl.online_tracker.online_tracker_ilqr import ILQROnlineTracking
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
 from cucrl.utils.classes import TruePolicy, MPCParameters, DynamicsModel
@@ -11,17 +11,14 @@ pytree = Any
 
 
 class MPCTracker:
-    def __init__(self, state_dim: int, control_dim: int, angles_dim: List[int], scaling: Scaling,
-                 dynamics: AbstractDynamics, simulator_costs: SimulatorCostsAndConstraints,
-                 online_tracking_config: OnlineTrackingConfig):
-        self.angle_normalizer = AngleNormalizer(state_dim=state_dim, control_dim=control_dim, angles_dim=angles_dim,
+    def __init__(self, x_dim: int, u_dim: int, scaling: Scaling, dynamics: AbstractDynamics,
+                 simulator_costs: SimulatorCostsAndConstraints, interaction_config: InteractionConfig):
+        self.angle_normalizer = AngleNormalizer(state_dim=x_dim, control_dim=u_dim,
+                                                angles_dim=interaction_config.angles_dim,
                                                 state_scaling=scaling.state_scaling)
 
-        self.mpc_tracker = ILQROnlineTracking(x_dim=state_dim, u_dim=control_dim,
-                                              num_nodes=online_tracking_config.num_nodes,
-                                              time_horizon=(0, online_tracking_config.time_horizon), dynamics=dynamics,
-                                              simulator_costs=simulator_costs,
-                                              dynamics_tracking=online_tracking_config.dynamics_tracking)
+        self.mpc_tracker = ILQROnlineTracking(x_dim=x_dim, u_dim=u_dim, dynamics=dynamics,
+                                              simulator_costs=simulator_costs, interaction_config=interaction_config)
 
     def update_mpc(self, cur_x, cur_t, tracking_data, mpc_params: MPCParameters,
                    dynamics_model: DynamicsModel) -> TruePolicy:
