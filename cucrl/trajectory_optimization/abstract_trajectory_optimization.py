@@ -21,5 +21,5 @@ class AbstractTrajectoryOptimization(ABC):
         pass
 
     @abstractmethod
-    def example_OCSolution(self) -> OCSolution:
+    def example_oc_solution(self) -> OCSolution:
         pass

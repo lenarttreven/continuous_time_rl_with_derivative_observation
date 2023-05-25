@@ -44,22 +44,22 @@ class LearnSystem:
         self.config = config
         self._prepare_dimensions(config.data_generator)
 
-        self.angle_layer = AngleLayerDynamics(state_dim=self.state_dim, control_dim=self.control_dim,
+        self.angle_layer = AngleLayerDynamics(state_dim=self.x_dim, control_dim=self.u_dim,
                                               angles_dim=config.interaction.angles_dim,
                                               state_scaling=self.config.data_generator.simulator.scaling.state_scaling)
-        self.normalizer = Normalizer(state_dim=self.state_dim, action_dim=self.control_dim,
+        self.normalizer = Normalizer(state_dim=self.x_dim, action_dim=self.u_dim,
                                      tracking_c=None, angle_layer=self.angle_layer)
-        init_stats_state = Stats(jnp.zeros(shape=(self.state_dim,)), jnp.ones(shape=(self.state_dim,)))
-        init_stats_control = Stats(jnp.zeros(shape=(self.control_dim,)), jnp.ones(shape=(self.control_dim,)))
+        init_stats_state = Stats(jnp.zeros(shape=(self.x_dim,)), jnp.ones(shape=(self.x_dim,)))
+        init_stats_control = Stats(jnp.zeros(shape=(self.u_dim,)), jnp.ones(shape=(self.u_dim,)))
         init_stats_time = Stats(jnp.zeros(shape=(1,)), jnp.ones(shape=(1,)))
-        angles_shape = self.angle_layer.angle_layer(jnp.ones(shape=(self.state_dim,))).shape
+        angles_shape = self.angle_layer.angle_layer(jnp.ones(shape=(self.x_dim,))).shape
         init_stats_after_angle_layer = Stats(jnp.zeros(shape=angles_shape), jnp.ones(shape=angles_shape))
 
         self.data_stats = DataStats(ts_stats=init_stats_time, xs_stats=init_stats_state, us_stats=init_stats_control,
                                     xs_dot_noise_stats=init_stats_state,
                                     xs_after_angle_layer=init_stats_after_angle_layer)
         # Prepare pool for vector field data
-        self.vector_field_data = DynamicsDataManager(self.state_dim, self.control_dim)
+        self.vector_field_data = DynamicsDataManager(self.x_dim, self.u_dim)
         self.simulator_costs = get_simulator_costs(config.data_generator.simulator.simulator_type,
                                                    scaling=self.config.data_generator.simulator.scaling)
 
@@ -96,7 +96,7 @@ class LearnSystem:
         self.track_just_loss = config.logging.track_just_loss
         self.visualization = config.logging.visualization
         # Prepare beta exploration
-        self.beta_exploration = BetaExploration(delta=0.1, state_dim=self.state_dim, rkhs_bound=1,
+        self.beta_exploration = BetaExploration(delta=0.1, state_dim=self.x_dim, rkhs_bound=1,
                                                 type=self.config.interaction.policy.offline_planning.beta_exploration)
 
         best_possible_discrete = BestPossibleDiscreteAlgorithm(
@@ -112,23 +112,23 @@ class LearnSystem:
 
     def _prepare_dimensions(self, data_generation: DataGeneratorConfig):
         self.data_generation_key = data_generation.data_collection.data_generation_key
-        self.control_dim = data_generation.control_dim
-        self.state_dim = data_generation.state_dim
+        self.u_dim = data_generation.control_dim
+        self.x_dim = data_generation.state_dim
         self.num_trajectories = len(data_generation.data_collection.initial_conditions)
         self.time_horizon = data_generation.simulator.time_horizon
         self.noise_stds = data_generation.data_collection.noise
 
     def _prepare_dynamics(self, dynamics: DynamicsConfig):
         time_dynamics = time.time()
-        self.dynamics = get_dynamics(dynamics_model=dynamics.type, state_dim=self.state_dim,
-                                     action_dim=self.control_dim, normalizer=self.normalizer,
+        self.dynamics = get_dynamics(dynamics_model=dynamics.type, state_dim=self.x_dim,
+                                     action_dim=self.u_dim, normalizer=self.normalizer,
                                      dynamics_config=dynamics,
                                      angle_layer=self.angle_layer,
                                      measurement_collection_config=self.config.interaction.measurement_collector)
         print("Time for dynamics preparation: ", time.time() - time_dynamics)
 
     def _prepare_controller(self, control_options, initial_condition):
-        self.policy = get_interactor(self.state_dim, self.control_dim, self.dynamics, initial_condition,
+        self.policy = get_interactor(self.x_dim, self.u_dim, self.dynamics, initial_condition,
                                      self.normalizer,
                                      self.angle_layer, control_options, self.offline_planner,
                                      self.config.data_generator.simulator.scaling)
@@ -140,14 +140,14 @@ class LearnSystem:
             simulator_dynamics=self.data_generator.simulator.simulator_dynamics, simulator_costs=self.simulator_costs,
             measurement_collection_config=self.config.interaction.measurement_collector)
         offline_planner = planner_class(
-            state_dim=self.state_dim, control_dim=self.control_dim, num_nodes=offline_planer_config.num_nodes,
+            state_dim=self.x_dim, control_dim=self.u_dim, num_nodes=offline_planer_config.num_nodes,
             numerical_method=offline_planer_config.numerical_method, time_horizon=self.time_horizon,
             dynamics=true_dynamics_wrapper, simulator_costs=self.simulator_costs,
             exploration_strategy=offline_planer_config.exploration_strategy,
             exploration_norm=offline_planer_config.exploration_norm,
             minimize_method=offline_planer_config.minimization_method, )
 
-        true_policy = get_interactor(self.state_dim, self.control_dim, true_dynamics_wrapper, initial_condition,
+        true_policy = get_interactor(self.x_dim, self.u_dim, true_dynamics_wrapper, initial_condition,
                                      self.normalizer,
                                      self.angle_layer, control_options, offline_planner,
                                      self.config.data_generator.simulator.scaling)
@@ -159,11 +159,11 @@ class LearnSystem:
                                        beta=self.beta_exploration(num_episodes=1),
                                        history=DynamicsData(
                                            ts=jnp.ones(shape=(1, 1)),
-                                           xs=jnp.ones(shape=(1, self.state_dim)),
-                                           us=jnp.ones(shape=(1, self.control_dim)),
-                                           xs_dot_std=jnp.ones(shape=(1, self.state_dim)),
-                                           xs_dot=jnp.ones(shape=(1, self.state_dim))),
-                                       calibration_alpha=jnp.ones(shape=(self.state_dim,)))
+                                           xs=jnp.ones(shape=(1, self.x_dim)),
+                                           us=jnp.ones(shape=(1, self.u_dim)),
+                                           xs_dot_std=jnp.ones(shape=(1, self.x_dim)),
+                                           xs_dot=jnp.ones(shape=(1, self.x_dim))),
+                                       calibration_alpha=jnp.ones(shape=(self.x_dim,)))
         key = jax.random.PRNGKey(0)
         true_data_gen.simulator.interactor.update(dynamics_model=dynamics_model, key=key)
         trajs = true_data_gen.generate_trajectories(key)
@@ -212,13 +212,9 @@ class LearnSystem:
     def _prepare_offline_planner(self):
         policy_config = self.interaction.policy
         planner_class = get_offline_planner(policy_config.offline_planning.exploration_strategy)
-        self.offline_planner = planner_class(
-            state_dim=self.state_dim, control_dim=self.control_dim, num_nodes=offline_planer_config.num_nodes,
-            numerical_method=offline_planer_config.numerical_method, time_horizon=self.time_horizon,
-            dynamics=self.dynamics, simulator_costs=self.simulator_costs,
-            exploration_strategy=offline_planer_config.exploration_strategy,
-            exploration_norm=offline_planer_config.exploration_norm,
-            minimize_method=offline_planer_config.minimization_method)
+        self.offline_planner = planner_class(x_dim=self.x_dim, u_dim=self.u_dim, time_horizon=self.time_horizon,
+                                             dynamics=self.dynamics, simulator_costs=self.simulator_costs,
+                                             policy_config=policy_config)
 
     def _prepare_optimizer(self, optimizer: OptimizersConfig):
         # Prepare learning rate
@@ -408,11 +404,11 @@ class LearnSystem:
                                                beta=self.beta_exploration(num_episodes=num_episodes),
                                                history=DynamicsData(
                                                    ts=jnp.ones(shape=(1, 1)),
-                                                   xs=jnp.ones(shape=(1, self.state_dim)),
-                                                   us=jnp.ones(shape=(1, self.control_dim)),
-                                                   xs_dot_std=jnp.ones(shape=(1, self.state_dim)),
-                                                   xs_dot=jnp.ones(shape=(1, self.state_dim))),
-                                               calibration_alpha=jnp.ones(shape=(self.state_dim,)))
+                                                   xs=jnp.ones(shape=(1, self.x_dim)),
+                                                   us=jnp.ones(shape=(1, self.u_dim)),
+                                                   xs_dot_std=jnp.ones(shape=(1, self.x_dim)),
+                                                   xs_dot=jnp.ones(shape=(1, self.x_dim))),
+                                               calibration_alpha=jnp.ones(shape=(self.x_dim,)))
                 self.data_generator.simulator.interactor.update(dynamics_model=dynamics_model, key=key)
             data, measurement_selection = self.generate_data()
             # Add data to permanent pool
@@ -446,7 +442,7 @@ class LearnSystem:
 
             self.dynamics_model = DynamicsModel(params=self.parameters['dynamics'], model_stats=self.stats['dynamics'],
                                                 data_stats=self.data_stats, episode=episode + 1,
-                                                calibration_alpha=jnp.ones(shape=(self.state_dim,)),
+                                                calibration_alpha=jnp.ones(shape=(self.x_dim,)),
                                                 history=self.vector_field_data.permanent_pool)
 
             # Compute calibration

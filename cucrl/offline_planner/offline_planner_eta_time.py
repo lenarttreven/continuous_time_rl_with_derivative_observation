@@ -10,14 +10,13 @@ from cucrl.dynamics_with_control.dynamics_models import AbstractDynamics
 from cucrl.main.config import PolicyConfig
 from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanner
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
-from cucrl.utils.classes import OCSolution, OfflinePlanningParams, DynamicsModel, DynamicsIdentifier
+from cucrl.utils.classes import OCSolution, DynamicsModel, DynamicsIdentifier
 from cucrl.utils.representatives import MinimizationMethod
 
 
 class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
     def __init__(self, x_dim: int, u_dim: int, time_horizon: Tuple[float, float], dynamics: AbstractDynamics,
                  simulator_costs: SimulatorCostsAndConstraints,
-                 minimize_method: MinimizationMethod = MinimizationMethod.ILQR_WITH_CEM,
                  policy_config: PolicyConfig = PolicyConfig()):
         super().__init__(x_dim=x_dim, u_dim=u_dim, time_horizon=time_horizon, dynamics=dynamics,
                          simulator_costs=simulator_costs)
@@ -36,7 +35,7 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
         self.num_total_params = (self.x_dim + self.u_dim) * self.num_control_nodes
 
         # Setup optimizer, i.e., either ILQR or ILQR with CEM
-        self.minimize_method = minimize_method
+        self.minimize_method = policy_config.offline_planning.minimization_method
         if self.minimize_method == MinimizationMethod.ILQR_WITH_CEM:
             self.cem_params = CEMHyperparams(max_iter=10, sampling_smoothing=0.0, num_samples=200,
                                              evolution_smoothing=0.0,
@@ -55,7 +54,7 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
                                   idx=jnp.ones(shape=(), dtype=jnp.int32),
                                   key=jnp.ones(shape=(2,), dtype=jnp.int32))
 
-    def example_OCSolution(self) -> OCSolution:
+    def example_oc_solution(self) -> OCSolution:
         return OCSolution(ts=self.ts, xs=jnp.ones(shape=(self.num_nodes, self.x_dim)),
                           us=jnp.ones(shape=(self.num_nodes, self.u_dim)), opt_value=jnp.ones(shape=()),
                           dynamics_id=self.example_dynamics_id())
@@ -97,15 +96,14 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
 
         return cond(t == self.num_control_nodes, terminal_cost, running_cost, x, u, t)
 
-    def plan_offline(self, dynamics_model: DynamicsModel, initial_parameters: OfflinePlanningParams,
-                     x0: chex.Array) -> OCSolution:
+    def plan_offline(self, dynamics_model: DynamicsModel, key: chex.PRNGKey, x0: chex.Array) -> OCSolution:
         initial_actions = jnp.zeros(shape=(self.num_control_nodes, self.u_dim + self.x_dim))
         match self.minimize_method:
             case MinimizationMethod.ILQR_WITH_CEM:
                 results = self.optimizer.solve(dynamics_model, dynamics_model, x0, initial_actions,
                                                control_low=self.control_low, control_high=self.control_high,
                                                ilqr_hyperparams=self.ilqr_params, cem_hyperparams=self.cem_params,
-                                               random_key=initial_parameters.key)
+                                               random_key=key)
             case MinimizationMethod.ILQR:
                 results = self.optimizer.solve(dynamics_model, dynamics_model, x0, initial_actions, self.ilqr_params)
             case _:

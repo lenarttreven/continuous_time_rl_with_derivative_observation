@@ -22,12 +22,12 @@ PolicyOut = Tuple[chex.Array, IntegrationCarry]
 
 
 class MPCTracking(Policy):
-    def __init__(self, state_dim, control_dim, dynamics: AbstractDynamics, initial_conditions, normalizer,
+    def __init__(self, x_dim, u_dim, dynamics: AbstractDynamics, initial_conditions, normalizer,
                  angle_layer: AngleLayerDynamics, interaction_config: InteractionConfig,
                  offline_planner: AbstractOfflinePlanner, scaling: Scaling):
-        super(MPCTracking, self).__init__(state_dim, control_dim, initial_conditions, normalizer, offline_planner,
+        super(MPCTracking, self).__init__(x_dim, u_dim, initial_conditions, normalizer, offline_planner,
                                           interaction_config, angle_layer, scaling)
-        self.mpc_tracker = MPCTracker(state_dim, control_dim, interaction_config.angles_dim, scaling,
+        self.mpc_tracker = MPCTracker(x_dim, u_dim, interaction_config.angles_dim, scaling,
                                       dynamics, offline_planner.simulator_costs,
                                       interaction_config.policy.online_tracking)
 

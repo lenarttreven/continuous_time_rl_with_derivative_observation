@@ -161,4 +161,4 @@ class EtaOfflinePlanner(AbstractOfflinePlanner):
                      initial_conditions: jax.Array):
         eta = random.normal(key=initial_parameters.key, shape=(self.x_dim,))
         params_for_opt = jnp.concatenate([eta, initial_parameters.xs_and_us_params])
-        return pure_callback(self._solve, self.example_OCSolution, dynamics_model, initial_conditions, params_for_opt)
+        return pure_callback(self._solve, self.example_oc_solution, dynamics_model, initial_conditions, params_for_opt)

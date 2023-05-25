@@ -7,7 +7,7 @@ from jax.tree_util import tree_map
 
 from cucrl.main.config import InteractionConfig
 from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanner
-from cucrl.utils.classes import OfflinePlanningParams, DynamicsModel, OfflinePlanningData, OCSolution
+from cucrl.utils.classes import DynamicsModel, OfflinePlanningData, OCSolution
 
 pytree = Any
 
@@ -18,19 +18,15 @@ class Planner:
     def __init__(self, offline_planner: AbstractOfflinePlanner, interaction_config: InteractionConfig):
         self.offline_planner = offline_planner
         self.interaction_config = interaction_config
-        total_dim = self.offline_planner.x_dim + self.offline_planner.u_dim
-        self.num_params = total_dim * self.offline_planner.num_nodes
 
         self.plan = jit(self.prepare_plan(self.solve))
         self.initialize = jit(self.prepare_plan(self.solve_init))
 
     def solve(self, key, x0, dynamics_model: DynamicsModel) -> OCSolution:
-        keys = random.split(key, 2)
-        solver_params = OfflinePlanningParams(random.normal(key=keys[0], shape=(self.num_params,)), keys[1])
-        return self.offline_planner.plan_offline(dynamics_model, solver_params, x0)
+        return self.offline_planner.plan_offline(dynamics_model, key, x0)
 
     def solve_init(self, *_) -> OCSolution:
-        return self.offline_planner.example_OCSolution
+        return self.offline_planner.example_oc_solution()
 
     def prepare_plan(self, solve_fun: SolveFun):
         def _plan(dynamics_model: DynamicsModel, initial_conditions: jax.Array,
