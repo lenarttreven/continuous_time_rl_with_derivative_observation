@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from functools import partial
 from typing import NamedTuple, Tuple, List
 
 import chex
@@ -6,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 from jax import random, vmap, jit
-from jax.lax import cond, bitwise_and, bitwise_not, scan
+from jax.lax import scan
 from jax.tree_util import tree_map
 
 from cucrl.environment_interactor.interactor import Interactor
@@ -193,10 +194,15 @@ class ForwardEuler(Integrator):
         self.ts = jnp.linspace(*simulator_config.time_horizon, simulator_config.num_nodes + 1)
         self.between_control_ts = jnp.linspace(self.ts[0], self.ts[1], simulator_config.num_int_step_between_nodes + 1)
 
-    @jit
+        total_num_steps = simulator_config.num_int_step_between_nodes * simulator_config.num_nodes + 1
+        self.all_ts = jnp.linspace(*simulator_config.time_horizon, total_num_steps)
+
+
+    @partial(jit, static_argnums=0)
     def between_control_points(self, x, u, t) -> Tuple[chex.Array, BetweenControlState]:
         assert x.shape == (self.simulator_dynamics.state_dim,) and u.shape == (self.simulator_dynamics.control_dim,)
-        assert t.shape == () and t.dtype == jnp.int32
+        assert t.shape == ()
+        chex.assert_type(t, int)
         cur_ts = self.ts[t] + self.between_control_ts[:-1]
 
         def _next_step(x: chex.Array, t: chex.Array) -> Tuple[chex.Array, StateDerivativePair]:
@@ -218,46 +224,45 @@ class ForwardEuler(Integrator):
                                  measurement_selection=measurement_selection)
         return new_carry, new_y
 
-    def f(self, carry: _IntegrationCarry, _):
-        def true_fun(carry: _IntegrationCarry):
-            def print_f(carry):
-                jax.debug.print("Current time in simulation: {x}", x=carry.t)
-
-            def skip_print(carry):
-                pass
-
-            cond(jnp.allclose(jnp.mod(carry.t, 1), jnp.zeros_like(carry.t), atol=self.step_size), print_f, skip_print,
-                 carry)
-
-            u, measurement_selection, new_events = self.interactor.interact(carry.x, carry.t, carry.traj_idx,
-                                                                            carry.events)
-            x_dot = self.simulator_dynamics.dynamics(carry.x, u, carry.t)
-            new_terminate_condition = jnp.array(False)
-            new_carry = _IntegrationCarry(x=carry.x + self.step_size * x_dot, t=carry.t + self.step_size,
-                                          events=new_events, terminate_condition=new_terminate_condition,
-                                          traj_idx=carry.traj_idx)
-            new_y = _IntegrationData(carry.x, u, carry.t, x_dot, new_terminate_condition, measurement_selection)
-            return new_carry, new_y
-
-        def false_fun(carry: _IntegrationCarry):
-            new_carry = _IntegrationCarry(x=carry.x, t=carry.t + self.step_size, events=carry.events,
-                                          terminate_condition=jnp.array(True), traj_idx=carry.traj_idx)
-            new_y = _IntegrationData(jnp.zeros(shape=(self.simulator_dynamics.state_dim,)),
-                                     jnp.zeros(shape=(self.simulator_dynamics.control_dim,)),
-                                     carry.t, jnp.zeros(shape=(self.simulator_dynamics.state_dim,)),
-                                     jnp.array(True),
-                                     self.interactor.measurements_collector.default_measurement_selection())
-            return new_carry, new_y
-
-        return cond(bitwise_and(self.check_terminal_condition(carry), bitwise_not(carry.terminate_condition)), true_fun,
-                    false_fun, carry)
+    # def f(self, carry: _IntegrationCarry, _):
+    #     def true_fun(carry: _IntegrationCarry):
+    #         def print_f(carry):
+    #             jax.debug.print("Current time in simulation: {x}", x=carry.t)
+    #
+    #         def skip_print(carry):
+    #             pass
+    #
+    #         cond(jnp.allclose(jnp.mod(carry.t, 1), jnp.zeros_like(carry.t), atol=self.step_size), print_f, skip_print,
+    #              carry)
+    #
+    #         u, measurement_selection, new_events = self.interactor.interact(carry.x, carry.t, carry.traj_idx,
+    #                                                                         carry.events)
+    #         x_dot = self.simulator_dynamics.dynamics(carry.x, u, carry.t)
+    #         new_terminate_condition = jnp.array(False)
+    #         new_carry = _IntegrationCarry(x=carry.x + self.step_size * x_dot, t=carry.t + self.step_size,
+    #                                       events=new_events, terminate_condition=new_terminate_condition,
+    #                                       traj_idx=carry.traj_idx)
+    #         new_y = _IntegrationData(carry.x, u, carry.t, x_dot, new_terminate_condition, measurement_selection)
+    #         return new_carry, new_y
+    #
+    #     def false_fun(carry: _IntegrationCarry):
+    #         new_carry = _IntegrationCarry(x=carry.x, t=carry.t + self.step_size, events=carry.events,
+    #                                       terminate_condition=jnp.array(True), traj_idx=carry.traj_idx)
+    #         new_y = _IntegrationData(jnp.zeros(shape=(self.simulator_dynamics.state_dim,)),
+    #                                  jnp.zeros(shape=(self.simulator_dynamics.control_dim,)),
+    #                                  carry.t, jnp.zeros(shape=(self.simulator_dynamics.state_dim,)),
+    #                                  jnp.array(True),
+    #                                  self.interactor.measurements_collector.default_measurement_selection())
+    #         return new_carry, new_y
+    #
+    #     return cond(bitwise_and(self.check_terminal_condition(carry), bitwise_not(carry.terminate_condition)), true_fun,
+    #                 false_fun, carry)
 
     def fast_simulate(self, ic, time_horizon, traj_idx, events) -> _IntegrationData:
-        start_t, end_t = time_horizon
-        xs = jnp.arange(start_t, end_t, self.step_size)
-        init = _IntegrationCarry(x=ic, t=jnp.array(start_t).reshape(1, ), terminate_condition=jnp.array(False),
+        init = _IntegrationCarry(x=ic, t=jnp.array(0), terminate_condition=jnp.array(False),
                                  traj_idx=traj_idx, events=events)
-        new_carry, to_return = scan(self.f, init, xs)
+
+        new_carry, to_return = scan(self.integration_step, init, None, length=self.simulator_config.num_nodes)
         return to_return
 
     def simulate(self, ic, time_horizon, traj_idx, events):

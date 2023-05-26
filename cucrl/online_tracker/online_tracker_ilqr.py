@@ -47,9 +47,12 @@ class ILQROnlineTracking(AbstractOnlineTracker):
         total_int_steps = policy_config.num_nodes * policy_config.num_int_step_between_nodes
         self.dt = total_time / total_int_steps
 
+        self.between_control_indices = jnp.arange(self.num_nodes)
+
         # Setup optimizer
         self.ilqr = ILQR(self.cost_fn, self.dynamics_fn)
         self.ilqr_hyperparams = ILQRHyperparams(maxiter=100)
+        self.u_init = jnp.zeros((self.num_nodes - 1, self.u_dim))
 
     def example_dynamics_id(self) -> DynamicsIdentifier:
         return DynamicsIdentifier(eta=jnp.ones(shape=(self.num_nodes, self.x_dim)),
@@ -71,7 +74,8 @@ class ILQROnlineTracking(AbstractOnlineTracker):
 
     def dynamics_fn(self, x_k: chex.Array, u_k: chex.Array, k: chex.Array, dynamics_ilqr: DynamicsILQR):
         # t will go over array [0, ..., num_nodes - 1]
-        assert x_k.shape == (self.x_dim,) and u_k.shape == (self.u_dim,) and k.shape == () and k.dtype == jnp.int32
+        assert x_k.shape == (self.x_dim,) and u_k.shape == (self.u_dim,) and k.shape == ()
+        chex.assert_type(k, int)
         # dynamics_ilqr.us_track is a (num_nodes - 1, u_dim) array
 
         init_time = dynamics_ilqr.ts_track[k]
@@ -86,7 +90,8 @@ class ILQROnlineTracking(AbstractOnlineTracker):
         return x_k_next
 
     def cost_fn(self, x_k, u_k, k, cost_ilqr: CostILQR):
-        assert x_k.shape == (self.x_dim,) and u_k.shape == self.u_dim and k.shape == () and k.dtype == jnp.int32
+        assert x_k.shape == (self.x_dim,) and u_k.shape == (self.u_dim,) and k.shape == ()
+        chex.assert_type(k, int)
 
         def running_cost(x, u, t):
             init_time = cost_ilqr.ts_track[k]
@@ -107,12 +112,13 @@ class ILQROnlineTracking(AbstractOnlineTracker):
         return cond(k == self.num_nodes - 1, terminal_cost, running_cost, x_k, u_k, k)
 
     def prepare_tracking_data(self, tracking_data: TrackingData, t_start):
-        t_indices = t_start + jnp.arange(self.num_nodes - 1)
+        t_indices = t_start + self.between_control_indices
         return vmap(tracking_data)(t_indices)
 
     def track_online(self, dynamics_model: DynamicsModel, initial_conditions: chex.Array, mpc_params: MPCParameters,
                      tracking_data: TrackingData, t_start_idx: chex.Array) -> OCSolution:
-        assert t_start_idx.shape == () and t_start_idx.dtype == jnp.int32
+        assert t_start_idx.shape == ()
+        chex.assert_type(t_start_idx, int)
         # xs_track, us_track are of shape (num_nodes, x_dim) and (num_nodes - 1, u_dim) respectively
         xs_track, us_track, ts_track = self.prepare_tracking_data(tracking_data, t_start_idx)
 
@@ -120,8 +126,7 @@ class ILQROnlineTracking(AbstractOnlineTracker):
                                      ts_track=ts_track, )
         cost_ilqr = CostILQR(xs_track=xs_track, ts_track=ts_track, dynamics_model=dynamics_model)
 
-        u_init = jnp.zeros((self.num_nodes - 1, self.u_dim))
-        results = self.ilqr.solve(cost_ilqr, dynamics_ilqr, initial_conditions, u_init, self.ilqr_hyperparams)
+        results = self.ilqr.solve(cost_ilqr, dynamics_ilqr, initial_conditions, self.u_init, self.ilqr_hyperparams)
 
         jax.debug.print("Objective value: {x}", x=results.obj)
         xs, delta_us = results.xs, results.us

@@ -75,7 +75,8 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
 
     def other_episode_hallucination(self, x_k: chex.Array, t_k: chex.Array, events: IntegrationCarry,
                                     dynamics_model: DynamicsModel, tracking_data: TrackingData) -> HallucinationOut:
-        assert x_k.shape == (self.x_dim,) and t_k.shape == () and t_k.dtype == jnp.int32
+        assert x_k.shape == (self.x_dim,) and t_k.shape == ()
+        chex.assert_type(t_k, int)
         # Events are also filtered to the trajectory that we are hallucinating (filtering is done with the integrator)
         # Hallucinate trajectory
         jax.debug.print("Hallucinate other episode time step: {t}", t=t_k)
@@ -115,6 +116,9 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
             x_next = x + self.inner_dt * x_dot
             return x_next, x_next
 
+        jax.debug.print("Hallucinate other episode time step: {t}", t=hal_carry.t_k)
+
+        # Todo: all_ts needs to be extended to include the hallucination horizon
         x_next, _ = jax.lax.scan(_next_step, hal_carry.x_k, self.all_ts[hal_carry.t_k])
 
         # Return next hallucination carry and trajectory for jax.lax.scan
@@ -145,18 +149,19 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
             potential_ts=jnp.zeros(shape=(config.num_interpolated_values, 1)),
             proposed_ts=proposed_times.reshape(-1, 1),
             vars_before_collection=jnp.ones(shape=(config.num_interpolated_values, self.x_dim)),
-            proposed_indices=jnp.arange(config.batch_size_per_time_horizon, dtype=jnp.int32),
+            proposed_indices=jnp.arange(config.batch_size_per_time_horizon, dtype=jnp.int64),
         )
         return measurement_selection, new_events
 
     def apply_hallucination(self, x_k: chex.Array, t_k: chex.Array, events: IntegrationCarry,
                             tracking_data: TrackingData, dynamics_model: DynamicsModel) -> HallucinationOut:
+        return self.default_measurement_selection(), events
         # We can hallucinate on the mean dynamics, the optimistic dynamics with epsilon, dynamics with particle or
         # with Gaussian Process, we implement it here for the mean dynamics first, we return the next time for sampling
-        jax.debug.print("Hallucinate time step: {t}", t=t_k)
-        jax.debug.print("Episode for hallucination: {episode}", episode=dynamics_model.episode)
-        return cond(dynamics_model.episode == 0, self.episode_zero_hallucination, self.other_episode_hallucination, x_k,
-                    t_k, events, dynamics_model, tracking_data)
+        # jax.debug.print("Hallucinate time step: {t}", t=t_k)
+        # jax.debug.print("Episode for hallucination: {episode}", episode=dynamics_model.episode)
+        # return cond(dynamics_model.episode == 0, self.episode_zero_hallucination, self.other_episode_hallucination, x_k,
+        #             t_k, events, dynamics_model, tracking_data)
 
     def not_apply_hallucination(self, x_k: chex.Array, t_k: chex.Array, events: IntegrationCarry,
                                 tracking_data: TrackingData, dynamics_model: DynamicsModel) -> HallucinationOut:
@@ -173,7 +178,7 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
             potential_ts=jnp.zeros(shape=(config.num_interpolated_values, 1)),
             proposed_ts=proposed_times.reshape(-1, 1),
             vars_before_collection=jnp.ones(shape=(config.num_interpolated_values, self.x_dim)),
-            proposed_indices=jnp.arange(config.batch_size_per_time_horizon, dtype=jnp.int32)
+            proposed_indices=jnp.arange(config.batch_size_per_time_horizon, dtype=jnp.int64)
         )
         return measurement_selection
 
@@ -186,7 +191,7 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
     def update(self, dynamics_model: DynamicsModel, key: random.PRNGKey) -> CollectorCarry:
         hallucination_steps = self.time_sampler.time_steps(dynamics_model.beta)
 
-        next_measurement_time = jnp.zeros(shape=(self.num_traj,), dtype=jnp.int32)
+        next_measurement_time = jnp.zeros(shape=(self.num_traj,), dtype=jnp.int64)
         keys = random.split(key, self.num_traj)
         collector_carry = CollectorCarry(next_measurement_time=next_measurement_time, key=keys,
                                          hallucination_steps=jnp.repeat(hallucination_steps[None, ...],

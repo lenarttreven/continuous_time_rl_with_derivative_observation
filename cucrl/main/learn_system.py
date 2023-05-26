@@ -139,17 +139,12 @@ class LearnSystem:
         true_dynamics_wrapper = TrueDynamicsWrapper(
             simulator_dynamics=self.data_generator.simulator.simulator_dynamics, simulator_costs=self.simulator_costs,
             measurement_collection_config=self.config.interaction.measurement_collector)
-        offline_planner = planner_class(
-            state_dim=self.x_dim, control_dim=self.u_dim, num_nodes=offline_planer_config.num_nodes,
-            numerical_method=offline_planer_config.numerical_method, time_horizon=self.time_horizon,
-            dynamics=true_dynamics_wrapper, simulator_costs=self.simulator_costs,
-            exploration_strategy=offline_planer_config.exploration_strategy,
-            exploration_norm=offline_planer_config.exploration_norm,
-            minimize_method=offline_planer_config.minimization_method, )
+        offline_planner = planner_class(x_dim=self.x_dim, u_dim=self.u_dim, time_horizon=self.time_horizon,
+                                        dynamics=true_dynamics_wrapper, simulator_costs=self.simulator_costs,
+                                        policy_config=self.interaction.policy)
 
         true_policy = get_interactor(self.x_dim, self.u_dim, true_dynamics_wrapper, initial_condition,
-                                     self.normalizer,
-                                     self.angle_layer, control_options, offline_planner,
+                                     self.normalizer,self.angle_layer, control_options, offline_planner,
                                      self.config.data_generator.simulator.scaling)
 
         true_data_gen = DataGenerator(data_generation=self.config.data_generator, interactor=true_policy)

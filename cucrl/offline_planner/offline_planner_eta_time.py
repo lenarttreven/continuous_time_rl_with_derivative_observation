@@ -65,7 +65,9 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
         return x_dot_mean + jnp.tanh(eta) * x_dot_std
 
     def dynamics_fn(self, x, u, t, dynamics_model: DynamicsModel):
-        assert x.shape == (self.x_dim,) and u.shape == (self.u_dim,) and t.shape == () and t.dtype == jnp.int32
+        assert x.shape == (self.x_dim,) and u.shape == (self.u_dim + self.x_dim,) and t.shape == ()
+        chex.assert_type(t, int)
+
         cur_ts = self.ts[t] + self.between_control_ts[:-1]
 
         def _next_step(_x: chex.Array, _t: chex.Array) -> Tuple[chex.Array, chex.Array]:
@@ -88,7 +90,7 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
                 return x_next, self.dt * self.simulator_costs.running_cost(_x_, _u[:self.u_dim])
 
             x_last, cs = jax.lax.scan(_next_step, _x, cur_ts)
-            assert cs.shape == (self.policy_config.num_int_step_between_nodes,)
+            assert cs.shape == (self.policy_config.num_int_step_between_nodes - 1,)
             return jnp.sum(cs)
 
         def terminal_cost(_x, _u, _t):

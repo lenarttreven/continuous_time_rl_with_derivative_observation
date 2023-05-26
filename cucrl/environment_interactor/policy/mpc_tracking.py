@@ -58,7 +58,8 @@ class MPCTracking(Policy):
 
     def other_episode(self, x_k: chex.Array, t_k: chex.Array, events: IntegrationCarry, tracking_data,
                       dynamics_model: DynamicsModel) -> PolicyOut:
-        assert x_k.shape == (self.dynamics.x_dim,) and t_k.shape == () and t_k.dtype == jnp.int32
+        assert x_k.shape == (self.dynamics.x_dim,) and t_k.shape == ()
+        chex.assert_type(t_k, int)
         new_events = cond(t_k == events.mpc_carry.next_update_time, self.update_mpc_for_cond,
                           self.no_update_mpc_for_cond, x_k, t_k, events, tracking_data, dynamics_model)
         return new_events.mpc_carry.true_policy(t_k), new_events
@@ -81,10 +82,10 @@ class MPCTracking(Policy):
                                      us=offline_planning_data.us, final_t=offline_planning_data.final_t,
                                      target_x=offline_planning_data.target_x, target_u=offline_planning_data.target_u)
 
-        next_update_time = jnp.zeros(shape=(self.num_traj,), dtype=jnp.int32)
+        next_update_time = jnp.zeros(shape=(self.num_traj,), dtype=jnp.int64)
         mpc_parameters = MPCParameters(dynamics_id=offline_planning_data.dynamics_ids)
 
-        num_tracking_nodes = self.mpc_tracker.mpc_tracker.num_nodes - 1
+        num_tracking_nodes = self.mpc_tracker.mpc_tracker.num_nodes
         ts_init = jnp.arange(num_tracking_nodes)
         true_policy = TruePolicy(ts_idx=jnp.repeat(ts_init[jnp.newaxis, ...], repeats=self.num_traj, axis=0),
                                  us=jnp.zeros(shape=(self.num_traj, num_tracking_nodes, self.u_dim)))

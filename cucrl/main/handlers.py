@@ -54,7 +54,7 @@ class DataGenerator:
         self.simulator_type = data_generation.simulator.simulator_type
         observation_noise = data_generation.data_collection.noise
         self.simulation_noise = [None] if observation_noise is None else observation_noise
-        self.simulator = ForwardEuler(interactor=interactor, simulator=data_generation.simulator)
+        self.simulator = ForwardEuler(interactor=interactor, simulator_config=data_generation.simulator)
 
     def generate_trajectories(self, rng: jnp.array) -> Tuple[DataRepr, MeasurementSelection]:
         key, subkey = jax.random.split(rng)

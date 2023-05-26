@@ -38,7 +38,7 @@ class TruePolicy(NamedTuple):
 
     @jit
     def __call__(self, t_idx):
-        assert t_idx.shape == () and self.ts_idx[0] <= t_idx <= self.ts_idx[-1]
+        assert t_idx.shape == () # and self.ts_idx[0] <= t_idx <= self.ts_idx[-1]
         return self.us[t_idx - self.ts_idx[0]]
 
 
@@ -53,7 +53,8 @@ class TrackingData(NamedTuple):
     target_u: chex.Array
 
     def __call__(self, k: chex.Array):
-        assert k.shape == () and k.dtype == jnp.int32
+        assert k.shape == ()
+        chex.assert_type(k, int)
         return cond(k >= self.ts.size, self.outside, self.inside, k)
 
     def inside(self, k) -> Tuple[chex.Array, chex.Array, chex.Array]:

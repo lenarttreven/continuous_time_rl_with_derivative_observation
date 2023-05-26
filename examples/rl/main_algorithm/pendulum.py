@@ -99,7 +99,7 @@ if __name__ == '__main__':
                 ),
                 offline_planning=OfflinePlanningConfig(
                     num_independent_runs=4,
-                    exploration_strategy=ExplorationStrategy.MEAN,
+                    exploration_strategy=ExplorationStrategy.OPTIMISTIC_ETA_TIME,
                     beta_exploration=BetaType.GP
                 ),
                 initial_control=initial_control,
