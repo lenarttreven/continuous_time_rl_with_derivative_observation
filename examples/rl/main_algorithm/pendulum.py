@@ -91,11 +91,11 @@ if __name__ == '__main__':
         interaction=InteractionConfig(
             time_horizon=time_horizon,
             policy=PolicyConfig(
-                num_nodes=100,
+                num_nodes=1000,
                 num_int_step_between_nodes=10,
                 online_tracking=OnlineTrackingConfig(
                     mpc_update_period=1,
-                    time_horizon=5.0,
+                    time_horizon=4.0,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(

@@ -15,16 +15,19 @@ from cucrl.main.config import InteractionConfig, Scaling
 from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanner
 from cucrl.time_sampler.time_sampler import TimeSampler
 from cucrl.utils.classes import IntegrationCarry, MPCParameters, DynamicsModel, CollectorCarry
-from cucrl.utils.classes import MeasurementSelection, TrackingData
+from cucrl.utils.classes import MeasurementSelection, TrackingData, TruePolicy
 
 pytree = Any
 
 
-class HallucinationCarry(NamedTuple):
+@chex.dataclass
+class HallucinationCarry:
     x_k: chex.Array
     t_k: chex.Array
+    next_mpc_update_idx: chex.Array
     tracking_data: Any
-    key: Any
+    true_policy: Any
+    key: chex.PRNGKey
     dynamics_model: DynamicsModel
     mpc_parameters: MPCParameters
 
@@ -81,7 +84,8 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
 
         new_key, subkey = random.split(events.collector_carry.key)
         hal_carry = HallucinationCarry(x_k=x_k, t_k=t_k, tracking_data=tracking_data, dynamics_model=dynamics_model,
-                                       key=subkey, mpc_parameters=events.mpc_carry.mpc_params)
+                                       key=subkey, mpc_parameters=events.mpc_carry.mpc_params,
+                                       next_mpc_update_idx=t_k, true_policy=self.mpc_tracker.true_policy_place_holder())
 
         _, traj = jax.lax.scan(self.hallucinate_step, hal_carry, xs=None,
                                length=hallucination_steps_arr.shape[0])
@@ -102,12 +106,22 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
 
     def hallucinate_step(self, hal_carry: HallucinationCarry, _):
         # Update true policy
-        # Todo: for now we update the policy at every iteration of hallucination; change it to be updated only
-        #  at selected periods
-        new_true_policy = self.mpc_tracker.update_mpc(hal_carry.x_k, hal_carry.t_k, hal_carry.tracking_data,
-                                                      hal_carry.mpc_parameters, hal_carry.dynamics_model)
+        def update_true_policy(_hal_carry: HallucinationCarry) -> Tuple[TruePolicy, HallucinationCarry]:
+            new_true_policy = self.mpc_tracker.update_mpc(_hal_carry.x_k, _hal_carry.t_k, _hal_carry.tracking_data,
+                                                          _hal_carry.mpc_parameters, _hal_carry.dynamics_model)
+
+            period = self.interaction_config.policy.online_tracking.mpc_update_period
+            _hal_carry = hal_carry.replace(true_policy=new_true_policy, next_mpc_update_idx=_hal_carry.t_k + period)
+            return new_true_policy, _hal_carry
+
+        def dont_update_true_policy(_hal_carry: HallucinationCarry):
+            return hal_carry.true_policy, hal_carry
+
+        true_policy, hal_carry = cond(hal_carry.t_k == hal_carry.next_mpc_update_idx,
+                                      update_true_policy, dont_update_true_policy, hal_carry)
+
         key, new_key = random.split(hal_carry.key)
-        u = new_true_policy(hal_carry.t_k)
+        u = true_policy(hal_carry.t_k)
 
         def _next_step(x: chex.Array, t: chex.Array) -> Tuple[chex.Array, chex.Array]:
             x_dot = self.dynamics.mean_eval_one(hal_carry.dynamics_model, x, u)
@@ -121,10 +135,7 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
         x_next, _ = jax.lax.scan(_next_step, hal_carry.x_k, ts_scan)
 
         # Return next hallucination carry and trajectory for jax.lax.scan
-        new_hal_carry = HallucinationCarry(x_k=x_next, t_k=hal_carry.t_k + 1, tracking_data=hal_carry.tracking_data,
-                                           mpc_parameters=hal_carry.mpc_parameters,
-                                           dynamics_model=hal_carry.dynamics_model, key=new_key)
-
+        new_hal_carry = hal_carry.replace(x_k=x_next, t_k=hal_carry.t_k + 1, key=new_key)
         return new_hal_carry, HallucinatedTrajectory(xs=hal_carry.x_k, us=u, ts=self.all_ts[hal_carry.t_k])
 
     def episode_zero_hallucination(self, x_k: chex.Array, t_k: chex.Array, events: IntegrationCarry,
