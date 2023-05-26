@@ -38,7 +38,13 @@ class Policy(ABC):
 
             return initial_control
         elif callable(self.interaction_config.policy.initial_control):
-            return self.interaction_config.policy.initial_control
+            outer_ts_nodes = jnp.linspace(*self.interaction_config.time_horizon,
+                                          self.interaction_config.policy.num_nodes + 1)
+
+            def initial_control(x_k, t_k):
+                return self.interaction_config.policy.initial_control(x_k, outer_ts_nodes[t_k])
+
+            return initial_control
         elif isinstance(self.interaction_config.policy.initial_control, jnp.ndarray):
             assert self.interaction_config.policy.initial_control.shape == (self.u_dim,)
 

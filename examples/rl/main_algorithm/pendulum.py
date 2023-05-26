@@ -2,6 +2,7 @@ import argparse
 import os
 
 import jax.numpy as jnp
+import jax.random
 from jax.config import config
 
 import wandb
@@ -14,7 +15,7 @@ from cucrl.main.learn_system import LearnSystem
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.helper_functions import namedtuple_to_dict
 from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, BNNTypes
-from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, Norm, BetaType
+from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, BetaType
 from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 
 config.update("jax_enable_x64", True)
@@ -72,7 +73,7 @@ if __name__ == '__main__':
 
             ),
             data_collection=DataCollection(
-                data_generation_key=data_generation_seed,
+                data_generation_key=jax.random.PRNGKey(data_generation_seed),
                 initial_conditions=initial_conditions,
                 num_matching_points=num_matching_points,
                 num_visualization_points=num_visualization_points,

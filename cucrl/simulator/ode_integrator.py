@@ -42,13 +42,6 @@ class _IntegrationData(NamedTuple):
     measurement_selection: MeasurementSelection
 
 
-class IntegrationDataOne(NamedTuple):
-    x: jnp.ndarray
-    u: jnp.ndarray
-    t: jnp.ndarray
-    x_dot: jnp.ndarray
-
-
 class _IntegrationCarry(NamedTuple):
     x: jax.Array
     t: jax.Array
@@ -98,12 +91,12 @@ class Integrator:
         if self.limited_budget:
             sim_data = self.check_budget(sim_data)
 
-        # Todo: add here the last point as well
-        ts_fixed_nodes = jnp.arange(*time_horizon, events.collector_carry.hallucination_setup.time_horizon)
-        ts_fixed_nodes = jnp.append(ts_fixed_nodes, time_horizon[1]).reshape(-1, 1)
+        fixed_nodes_period = events.collector_carry.hallucination_steps_arr.shape[0]
+        ts_fixed_nodes = self.ts[::fixed_nodes_period]
+
         ts_variable_nodes = jnp.concatenate(sim_data.measurement_selection.proposed_ts)
 
-        ts = jnp.concatenate([ts_fixed_nodes, ts_variable_nodes])
+        ts = jnp.concatenate([ts_fixed_nodes[None, ...], ts_variable_nodes])
         ts = jnp.sort(ts, axis=0)
 
         vis_ts = jnp.linspace(0, jnp.max(ts), num_vis_ts).reshape(-1, 1)
@@ -197,6 +190,9 @@ class ForwardEuler(Integrator):
         total_num_steps = simulator_config.num_int_step_between_nodes * simulator_config.num_nodes + 1
         self.all_ts = jnp.linspace(*simulator_config.time_horizon, total_num_steps)
 
+        inner_ts = self.between_control_ts[:-1]
+        outer_ts = self.ts[:-1]
+        self.integration_ts = outer_ts[..., None] + inner_ts[None, ...]
 
     @partial(jit, static_argnums=0)
     def between_control_points(self, x, u, t) -> Tuple[chex.Array, BetweenControlState]:
@@ -224,40 +220,6 @@ class ForwardEuler(Integrator):
                                  measurement_selection=measurement_selection)
         return new_carry, new_y
 
-    # def f(self, carry: _IntegrationCarry, _):
-    #     def true_fun(carry: _IntegrationCarry):
-    #         def print_f(carry):
-    #             jax.debug.print("Current time in simulation: {x}", x=carry.t)
-    #
-    #         def skip_print(carry):
-    #             pass
-    #
-    #         cond(jnp.allclose(jnp.mod(carry.t, 1), jnp.zeros_like(carry.t), atol=self.step_size), print_f, skip_print,
-    #              carry)
-    #
-    #         u, measurement_selection, new_events = self.interactor.interact(carry.x, carry.t, carry.traj_idx,
-    #                                                                         carry.events)
-    #         x_dot = self.simulator_dynamics.dynamics(carry.x, u, carry.t)
-    #         new_terminate_condition = jnp.array(False)
-    #         new_carry = _IntegrationCarry(x=carry.x + self.step_size * x_dot, t=carry.t + self.step_size,
-    #                                       events=new_events, terminate_condition=new_terminate_condition,
-    #                                       traj_idx=carry.traj_idx)
-    #         new_y = _IntegrationData(carry.x, u, carry.t, x_dot, new_terminate_condition, measurement_selection)
-    #         return new_carry, new_y
-    #
-    #     def false_fun(carry: _IntegrationCarry):
-    #         new_carry = _IntegrationCarry(x=carry.x, t=carry.t + self.step_size, events=carry.events,
-    #                                       terminate_condition=jnp.array(True), traj_idx=carry.traj_idx)
-    #         new_y = _IntegrationData(jnp.zeros(shape=(self.simulator_dynamics.state_dim,)),
-    #                                  jnp.zeros(shape=(self.simulator_dynamics.control_dim,)),
-    #                                  carry.t, jnp.zeros(shape=(self.simulator_dynamics.state_dim,)),
-    #                                  jnp.array(True),
-    #                                  self.interactor.measurements_collector.default_measurement_selection())
-    #         return new_carry, new_y
-    #
-    #     return cond(bitwise_and(self.check_terminal_condition(carry), bitwise_not(carry.terminate_condition)), true_fun,
-    #                 false_fun, carry)
-
     def fast_simulate(self, ic, time_horizon, traj_idx, events) -> _IntegrationData:
         init = _IntegrationCarry(x=ic, t=jnp.array(0), terminate_condition=jnp.array(False),
                                  traj_idx=traj_idx, events=events)
@@ -276,7 +238,12 @@ class ForwardEuler(Integrator):
         hallucination_indices = vmap(check_for_negative_one)(integration_data.measurement_selection.proposed_ts)
         measurement_selection = jtu.tree_map(lambda x: x[hallucination_indices], integration_data.measurement_selection)
 
-        # ts_variable_nodes = ts_variable_nodes[jnp.array(ts_variable_nodes != -1)]
-        return IntegrationData(xs=integration_data.xs[to_take], ts=integration_data.ts[to_take],
-                               us=integration_data.us[to_take], xs_dot=integration_data.xs_dot[to_take],
+        # Repeat the us
+        us = integration_data.us[to_take]
+        us = jnp.repeat(us[:, None, :], repeats=self.simulator_config.num_int_step_between_nodes, axis=1)
+
+        return IntegrationData(xs=jnp.concatenate(integration_data.xs[to_take]),
+                               ts=jnp.concatenate(self.integration_ts[to_take]),
+                               us=jnp.concatenate(us),
+                               xs_dot=jnp.concatenate(integration_data.xs_dot[to_take]),
                                measurement_selection=measurement_selection)

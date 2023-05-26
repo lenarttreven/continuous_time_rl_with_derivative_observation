@@ -1,8 +1,6 @@
 from typing import NamedTuple, List, Any, Tuple
 
 import chex
-import jax
-import jax.numpy as jnp
 from flax.core import FrozenDict
 from jax import jit
 from jax.lax import cond
@@ -38,7 +36,7 @@ class TruePolicy(NamedTuple):
 
     @jit
     def __call__(self, t_idx):
-        assert t_idx.shape == () # and self.ts_idx[0] <= t_idx <= self.ts_idx[-1]
+        assert t_idx.shape == ()  # and self.ts_idx[0] <= t_idx <= self.ts_idx[-1]
         return self.us[t_idx - self.ts_idx[0]]
 
 
@@ -116,7 +114,7 @@ class MPCCarry(NamedTuple):
 class CollectorCarry(NamedTuple):
     next_measurement_time: chex.Array | None = None
     key: chex.Array | None = None
-    hallucination_steps: chex.Array | None = None
+    hallucination_steps_arr: chex.Array | None = None
 
 
 class IntegrationCarry(NamedTuple):
