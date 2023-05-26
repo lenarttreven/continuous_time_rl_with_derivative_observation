@@ -1,20 +1,21 @@
 from typing import Callable
 
-import jax
+import chex
 import jax.numpy as jnp
 from cyipopt import minimize_ipopt
 from jax import jit, grad
 
-from cucrl.main.config import SystemAssumptions, TimeHorizonConfig
+from cucrl.main.config import InteractionConfig
 from cucrl.utils.representatives import TimeHorizonType
 
-Schedule = Callable[[int], jax.Array]
+Schedule = Callable[[int], chex.Array]
 
 
 class TimeSampler:
-    def __init__(self, system_assumptions: SystemAssumptions, time_horizon_config: TimeHorizonConfig):
-        self.system_assumptions = system_assumptions
-        self.time_horizon_config = time_horizon_config
+    def __init__(self, interaction_config: InteractionConfig):
+        self.system_assumptions = interaction_config.system_assumptions
+        self.time_horizon_config = interaction_config.measurement_collector.time_horizon
+        self.interaction_config = interaction_config
 
     @staticmethod
     @jit
@@ -26,7 +27,7 @@ class TimeSampler:
     def init_time_horizon(self):
         return self.time_horizon_config.init_horizon
 
-    def time_horizon(self, beta: jax.Array):
+    def time_horizon(self, beta: chex.Array):
         if self.time_horizon_config.type == TimeHorizonType.ADAPTIVE_TRUE:
             max_beta = jnp.max(beta)
             bnds = [(0, 1)]
@@ -39,13 +40,8 @@ class TimeSampler:
         elif self.time_horizon_config.type == TimeHorizonType.FIXED:
             return self.time_horizon_config.init_horizon
 
-
-if __name__ == '__main__':
-    from jax.config import config
-
-    config.update("jax_enable_x64", True)
-
-    sampler = TimeSampler(SystemAssumptions(jnp.array(1.0, dtype=jnp.float64), jnp.array(1.0, dtype=jnp.float64),
-                                            jnp.array(1.0, dtype=jnp.float64), jnp.array(0.5, dtype=jnp.float64)),
-                          TimeHorizonConfig(TimeHorizonType.ADAPTIVE_TRUE, 3.0))
-    print(sampler.time_horizon(jnp.array([1.0, 2.0])))
+    def time_steps(self, beta: chex.Array) -> chex.Array:
+        time_horizon = self.time_horizon(beta)
+        ts_nodes = jnp.linspace(*self.interaction_config.time_horizon, self.interaction_config.policy.num_nodes + 1)
+        num_nodes = jnp.sum(ts_nodes <= time_horizon)
+        return num_nodes

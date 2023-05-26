@@ -12,9 +12,9 @@ from cucrl.main.data_stats import DynamicsData
 
 
 class DynamicsIdentifier(NamedTuple):
-    key: jax.Array
-    idx: jax.Array
-    eta: jax.Array
+    key: chex.Array
+    idx: chex.Array
+    eta: chex.Array
 
 
 class NumberTrainPoints(NamedTuple):
@@ -24,8 +24,8 @@ class NumberTrainPoints(NamedTuple):
 
 
 class OfflinePlanningParams(NamedTuple):
-    xs_and_us_params: jax.Array
-    key: jax.Array
+    xs_and_us_params: chex.Array
+    key: chex.Array
 
 
 class MPCParameters(NamedTuple):
@@ -44,13 +44,13 @@ class TruePolicy(NamedTuple):
 
 class TrackingData(NamedTuple):
     # ts is the time points at which the tracking data (xs, us) is available
-    ts: jax.Array
-    xs: jax.Array
-    us: jax.Array
+    ts: chex.Array
+    xs: chex.Array
+    us: chex.Array
 
-    final_t: jax.Array
-    target_x: jax.Array
-    target_u: jax.Array
+    final_t: chex.Array
+    target_x: chex.Array
+    target_u: chex.Array
 
     def __call__(self, k: chex.Array):
         assert k.shape == () and k.dtype == jnp.int32
@@ -70,57 +70,52 @@ class TrackingData(NamedTuple):
 
 
 class PlotOpenLoop(NamedTuple):
-    times: jax.Array
-    states: jax.Array
-    controls: jax.Array
-    state_prediction: jax.Array
-    controls_prediction: jax.Array
-    visualization_times: jax.Array
+    times: chex.Array
+    states: chex.Array
+    controls: chex.Array
+    state_prediction: chex.Array
+    controls_prediction: chex.Array
+    visualization_times: chex.Array
 
 
 class PlotData(NamedTuple):
-    dynamics_der_means: jax.Array
-    dynamics_der_vars: jax.Array
-    actual_actions: jax.Array
-    visualization_times: jax.Array
-    observation_times: List[jax.Array]
-    observations: List[jax.Array]
-    gt_states_vis: jax.Array
-    gt_der_vis: jax.Array
-    prediction_states: jax.Array | None
-    predicted_actions: jax.Array | None
+    dynamics_der_means: chex.Array
+    dynamics_der_vars: chex.Array
+    actual_actions: chex.Array
+    visualization_times: chex.Array
+    observation_times: List[chex.Array]
+    observations: List[chex.Array]
+    gt_states_vis: chex.Array
+    gt_der_vis: chex.Array
+    prediction_states: chex.Array | None
+    predicted_actions: chex.Array | None
 
 
 class SampledData(NamedTuple):
-    xs: jax.Array
-    xs_dot: jax.Array
-    std_xs_dot: jax.Array
+    xs: chex.Array
+    xs_dot: chex.Array
+    std_xs_dot: chex.Array
 
 
 class Trajectory(NamedTuple):
-    ts: jax.Array
-    us: jax.Array
-    xs: jax.Array
-    xs_dot_true: jax.Array
-    xs_dot_noise: jax.Array
+    ts: chex.Array
+    us: chex.Array
+    xs: chex.Array
+    xs_dot_true: chex.Array
+    xs_dot_noise: chex.Array
 
 
 class MPCCarry(NamedTuple):
-    next_update_time: jax.Array | None = None
-    key: jax.Array | None = None
+    next_update_time: chex.Array | None = None
+    key: chex.Array | None = None
     mpc_params: MPCParameters | None = None
     true_policy: TruePolicy | None = None
 
 
-class HallucinationSetup(NamedTuple):
-    time_horizon: jax.Array
-    num_steps: int
-
-
 class CollectorCarry(NamedTuple):
-    next_measurement_time: jax.Array | None = None
-    key: jax.Array | None = None
-    hallucination_setup: HallucinationSetup | None = None
+    next_measurement_time: chex.Array | None = None
+    key: chex.Array | None = None
+    hallucination_steps: chex.Array | None = None
 
 
 class IntegrationCarry(NamedTuple):
@@ -129,28 +124,28 @@ class IntegrationCarry(NamedTuple):
 
 
 class OCSolution(NamedTuple):
-    ts: jax.Array
-    xs: jax.Array
-    us: jax.Array
-    opt_value: jax.Array
+    ts: chex.Array
+    xs: chex.Array
+    us: chex.Array
+    opt_value: chex.Array
     dynamics_id: DynamicsIdentifier
 
 
 class SmootherApply(NamedTuple):
-    xs_mean: jax.Array
-    xs_var: jax.Array
-    xs_dot_mean: jax.Array
-    xs_dot_var: jax.Array
-    xs_dot_var_given_x: jax.Array
-    loss: jax.Array
+    xs_mean: chex.Array
+    xs_var: chex.Array
+    xs_dot_mean: chex.Array
+    xs_dot_var: chex.Array
+    xs_dot_var_given_x: chex.Array
+    loss: chex.Array
     updated_stats: FrozenDict
 
 
 class SmootherPosterior(NamedTuple):
-    xs_mean: jax.Array
-    xs_var: jax.Array
-    xs_dot_mean: jax.Array
-    xs_dot_var: jax.Array
+    xs_mean: chex.Array
+    xs_var: chex.Array
+    xs_dot_mean: chex.Array
+    xs_dot_var: chex.Array
 
 
 class DynamicsModel(NamedTuple):
@@ -158,26 +153,26 @@ class DynamicsModel(NamedTuple):
     model_stats: Any | None = None
     data_stats: DataStats | None = None
     episode: int | None = None
-    beta: jax.Array | None = None
+    beta: chex.Array | None = None
     history: DynamicsData | None = None
-    calibration_alpha: jax.Array | None = None
+    calibration_alpha: chex.Array | None = None
 
 
 class OfflinePlanningData(NamedTuple):
-    ts: jax.Array
-    xs: jax.Array
-    us: jax.Array
-    x0s: jax.Array
-    final_t: jax.Array
-    target_x: jax.Array
-    target_u: jax.Array
+    ts: chex.Array
+    xs: chex.Array
+    us: chex.Array
+    x0s: chex.Array
+    final_t: chex.Array
+    target_x: chex.Array
+    target_u: chex.Array
     dynamics_ids: DynamicsIdentifier
 
 
 class MeasurementSelection(NamedTuple):
-    potential_ts: jax.Array
-    potential_xs: jax.Array
-    potential_us: jax.Array
-    vars_before_collection: jax.Array
-    proposed_ts: jax.Array
-    proposed_indices: jax.Array
+    potential_ts: chex.Array
+    potential_xs: chex.Array
+    potential_us: chex.Array
+    vars_before_collection: chex.Array
+    proposed_ts: chex.Array
+    proposed_indices: chex.Array

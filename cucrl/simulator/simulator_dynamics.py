@@ -5,7 +5,6 @@ from typing import Tuple, Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
-import mujoco
 from jax import jit, pure_callback
 
 from cucrl.main.config import Scaling
