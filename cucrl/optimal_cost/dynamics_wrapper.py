@@ -40,7 +40,7 @@ class TrueDynamicsWrapper(AbstractDynamics):
 
     def calculate_calibration_alpha(self, dynamics_model: DynamicsModel, xs: jax.Array, us: jax.Array,
                                     xs_dot: jax.Array, xs_dot_std) -> jax.Array:
-        return jnp.ones(shape=(self.state_dim,))
+        return jnp.ones(shape=(self.x_dim,))
 
     def propose_measurement_times(self, dynamics_model: DynamicsModel, xs_potential: jax.Array, us_potential: jax.Array,
                                   ts_potential: jax.Array, noise_std: float,
@@ -63,8 +63,8 @@ class TrueDynamicsWrapper(AbstractDynamics):
         ts_potential = ts_potential.reshape(-1, 1)
         proposed_ts = ts_potential[greedy_indices]
 
-        initial_variances = jnp.zeros((xs_potential.shape[0], self.state_dim,))
-        assert initial_variances.shape == (xs_potential.shape[0], self.state_dim,)
+        initial_variances = jnp.zeros((xs_potential.shape[0], self.x_dim,))
+        assert initial_variances.shape == (xs_potential.shape[0], self.x_dim,)
 
         return MeasurementSelection(proposed_ts=proposed_ts, potential_ts=ts_potential, potential_us=us_potential,
                                     potential_xs=xs_potential, vars_before_collection=initial_variances,

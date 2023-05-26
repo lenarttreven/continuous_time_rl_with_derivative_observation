@@ -72,9 +72,9 @@ def get_dynamics(dynamics_model: Dynamics, state_dim: int, action_dim: int, norm
 
 
 class AbstractDynamics(ABC):
-    def __init__(self, state_dim: int, action_dim: int):
-        self.state_dim = state_dim
-        self.action_dim = action_dim
+    def __init__(self, x_dim: int, u_dim: int):
+        self.x_dim = x_dim
+        self.u_dim = u_dim
         self.mean_and_std_eval_batch = vmap(self.mean_and_std_eval_one, in_axes=(None, 0, 0), out_axes=(0, 0),
                                             axis_name='batch')
 
@@ -109,19 +109,19 @@ class AbstractDynamics(ABC):
 
 
 class BNNDynamics(AbstractDynamics):
-    def __init__(self, state_dim: int, action_dim: int, normalizer: Normalizer, features: List[int],
+    def __init__(self, x_dim: int, u_dim: int, normalizer: Normalizer, features: List[int],
                  bandwidth_prior: float = 1.0, bandwidth_svgd: float = 0.2, num_particles: int = 5,
                  bnn_type: BNNTypes = BNNTypes.DETERMINISTIC_ENSEMBLE,
                  measurement_collection_config: MeasurementCollectionConfig = MeasurementCollectionConfig()):
-        super().__init__(state_dim=state_dim, action_dim=action_dim)
+        super().__init__(x_dim=x_dim, u_dim=u_dim)
         self.measurement_collection_config = measurement_collection_config
-        in_shape = normalizer.angle_layer.angle_layer(jnp.zeros((state_dim,))).shape[0]
+        in_shape = normalizer.angle_layer.angle_layer(jnp.zeros((x_dim,))).shape[0]
         if bnn_type == BNNTypes.DETERMINISTIC_ENSEMBLE:
-            self.BNN = DeterministicEnsemble(input_dim=in_shape + action_dim, output_dim=state_dim, features=features,
+            self.BNN = DeterministicEnsemble(input_dim=in_shape + u_dim, output_dim=x_dim, features=features,
                                              num_particles=num_particles, normalizer=normalizer)
         else:
             # TODO: domain, num measurement points
-            self.BNN = FSVGD(input_dim=in_shape + action_dim, output_dim=state_dim, bandwidth_prior=bandwidth_prior,
+            self.BNN = FSVGD(input_dim=in_shape + u_dim, output_dim=x_dim, bandwidth_prior=bandwidth_prior,
                              features=features, bandwidth_svgd=bandwidth_svgd, num_particles=num_particles,
                              domain_l=-1.5, domain_u=1.5, num_measurement_points=0, normalizer=normalizer)
 
@@ -155,7 +155,7 @@ class BNNDynamics(AbstractDynamics):
                               u: jax.Array) -> Tuple[jax.Array, jax.Array]:
         xs_dot = self._particle_prediction(dynamics_model, x, u)
         mean, std = jnp.mean(xs_dot, axis=0), jnp.std(xs_dot, axis=0)
-        assert mean.shape == std.shape == (self.state_dim,)
+        assert mean.shape == std.shape == (self.x_dim,)
         return mean, std * dynamics_model.calibration_alpha
 
     def mean_eval_one(self, dynamics_model: DynamicsModel, x: jax.Array, u: jax.Array, ) -> jax.Array:
@@ -190,7 +190,7 @@ class BNNDynamics(AbstractDynamics):
 
         covariance_matrix = posterior_kernel_m(dynamics_model, xs_potential, us_potential, xs_potential, us_potential)
 
-        assert covariance_matrix.shape == (self.state_dim, xs_potential.shape[0], xs_potential.shape[0])
+        assert covariance_matrix.shape == (self.x_dim, xs_potential.shape[0], xs_potential.shape[0])
         covariance_matrix = covariance_matrix + noise_std ** 2 * jnp.eye(xs_potential.shape[0])[None, ...]
 
         if self.measurement_collection_config.batch_strategy == BatchStrategy.MAX_DETERMINANT_GREEDY:
@@ -207,7 +207,7 @@ class BNNDynamics(AbstractDynamics):
 
         initial_variances = vmap(self._covariance, in_axes=(None, 0, 0, 0, 0), out_axes=0)(
             dynamics_model, xs_potential, us_potential, xs_potential, us_potential)
-        assert initial_variances.shape == (xs_potential.shape[0], self.state_dim,)
+        assert initial_variances.shape == (xs_potential.shape[0], self.x_dim,)
 
         return MeasurementSelection(proposed_ts=proposed_ts, potential_ts=ts_potential, potential_us=us_potential,
                                     potential_xs=xs_potential, vars_before_collection=initial_variances,
@@ -228,9 +228,9 @@ class BNNDynamics(AbstractDynamics):
 
 
 class GPDynamics(AbstractDynamics):
-    def __init__(self, state_dim, action_dim, normalizer, angle_layer: AngleLayerDynamics,
+    def __init__(self, x_dim, u_dim, normalizer, angle_layer: AngleLayerDynamics,
                  measurement_collection_config: MeasurementCollectionConfig):
-        super().__init__(state_dim=state_dim, action_dim=action_dim)
+        super().__init__(x_dim=x_dim, u_dim=u_dim)
         self.angle_layer = angle_layer
         self.normalizer = normalizer
         self.measurement_collection_config = measurement_collection_config
@@ -310,14 +310,14 @@ class GPDynamics(AbstractDynamics):
         return - jnp.sum(log_pdf), dict()
 
     def initialize_parameters(self, key):
-        expanded_x = self.angle_layer.angle_layer(jnp.ones(shape=(self.state_dim,)))
-        u = jnp.ones(shape=(self.action_dim,))
+        expanded_x = self.angle_layer.angle_layer(jnp.ones(shape=(self.x_dim,)))
+        u = jnp.ones(shape=(self.u_dim,))
         cat_input = jnp.concatenate([expanded_x, u])
         parameters = dict()
         # Inout dimension is state_dim + action_dim, we have one lengthscale for each dimension
         # Ouput dimension is state_dim, because we have one GP per state dimension
         # So we have lengthscales for each state dimension
-        parameters["lengthscale"] = random.normal(key=key, shape=(self.state_dim, cat_input.size))
+        parameters["lengthscale"] = random.normal(key=key, shape=(self.x_dim, cat_input.size))
         return parameters, dict()
 
     def mean_eval_one(self, dynamics_model: DynamicsModel, x: jax.Array, u: jax.Array) -> jax.Array:
@@ -360,7 +360,7 @@ class GPDynamics(AbstractDynamics):
                                   ts_potential: jax.Array, noise_std: float,
                                   num_meas_array: jax.Array) -> MeasurementSelection:
         assert xs_potential.shape[0] == us_potential.shape[0] == ts_potential.shape[0]
-        assert xs_potential.shape[1] == self.state_dim and us_potential.shape[1] == self.action_dim
+        assert xs_potential.shape[1] == self.x_dim and us_potential.shape[1] == self.u_dim
         assert ts_potential.shape[1] == 1
 
         expanded_xs = vmap(self.angle_layer.angle_layer)(dynamics_model.history.xs)
@@ -411,7 +411,7 @@ class GPDynamics(AbstractDynamics):
 
         covariance_matrix = posterior_kernel_m(potential_inputs, potential_inputs)
 
-        assert covariance_matrix.shape == (self.state_dim, xs_potential.shape[0], xs_potential.shape[0])
+        assert covariance_matrix.shape == (self.x_dim, xs_potential.shape[0], xs_potential.shape[0])
         covariance_matrix = covariance_matrix + noise_std ** 2 * jnp.eye(xs_potential.shape[0])[None, ...]
 
         if self.measurement_collection_config.batch_strategy == BatchStrategy.MAX_DETERMINANT_GREEDY:
@@ -427,7 +427,7 @@ class GPDynamics(AbstractDynamics):
         proposed_ts = ts_potential[greedy_indices]
 
         initial_variances = vmap(posterior_kernel, in_axes=(0, 0), out_axes=0)(potential_inputs, potential_inputs)
-        assert initial_variances.shape == (xs_potential.shape[0], self.state_dim,)
+        assert initial_variances.shape == (xs_potential.shape[0], self.x_dim,)
 
         return MeasurementSelection(proposed_ts=proposed_ts, potential_ts=ts_potential, potential_us=us_potential,
                                     potential_xs=xs_potential, vars_before_collection=initial_variances,
@@ -435,19 +435,19 @@ class GPDynamics(AbstractDynamics):
 
     def calculate_calibration_alpha(self, dynamics_model: DynamicsModel, xs: jax.Array, us: jax.Array,
                                     xs_dot: jax.Array, xs_dot_std) -> jax.Array:
-        return jnp.ones(shape=(self.state_dim,))
+        return jnp.ones(shape=(self.x_dim,))
 
 
 class AbstractfSVGDDynamics(AbstractDynamics):
-    def __init__(self, state_dim, action_dim, normalizer, features: Sequence[int], prior_h=1.0, stein_h: float = 0.2,
+    def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], prior_h=1.0, stein_h: float = 0.2,
                  num_particles: int = 5):
-        super().__init__(state_dim=state_dim, action_dim=action_dim)
+        super().__init__(x_dim=x_dim, u_dim=u_dim)
         self.num_particles = num_particles
         self.normalizer = normalizer
         self.features = features
         self.prior_h = prior_h
         self.stein_h = stein_h
-        self.model = MLP(features=self.features, output_dim=self.state_dim)
+        self.model = MLP(features=self.features, output_dim=self.x_dim)
         self.stein_kernel, self.stein_kernel_derivative = self._prepare_stein_kernel(h=self.stein_h ** 2)
         self.prior_kernel = self._prepare_prior_kernel(h=self.prior_h ** 2)
         self._unravel_one = self._prepare_unravel_one()
@@ -461,19 +461,19 @@ class AbstractfSVGDDynamics(AbstractDynamics):
         return self.normalizer.normalize(self._control_affine_part(x, u), data_stats.xs_dot_noise_stats)
 
     def _state_dynamics_train_one(self, params, stats, x, data_stats):
-        assert x.shape == (self.state_dim,)
+        assert x.shape == (self.x_dim,)
         x = self.normalizer.normalize(x, data_stats.xs_stats)
         net_out, new_state = self.model.apply({'params': params, **stats}, x, mutable=list(stats.keys()), train=True)
         return net_out, new_state
 
     def _state_dynamics_eval_one(self, params, stats, x, data_stats):
-        assert x.shape == (self.state_dim,)
+        assert x.shape == (self.x_dim,)
         x = self.normalizer.normalize(x, data_stats.xs_stats)
         net_out = self.model.apply({'params': params, **stats}, x)
         return net_out
 
     def _dynamics_eval_one(self, params, stats, x, u, data_stats):
-        assert x.shape == (self.state_dim,) and u.shape == (self.action_dim,)
+        assert x.shape == (self.x_dim,) and u.shape == (self.u_dim,)
         f = self._state_dynamics_eval_one(params, stats, x, data_stats)
         return f + self._norm_control_affine_part(x, u, data_stats)
 
@@ -486,7 +486,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
         return denormalize(x_dot, data_stats.xs_dot_noise_stats)
 
     def _dynamics_train_one(self, params, stats, x, u, data_stats):
-        assert x.shape == (self.state_dim,) and u.shape == (self.action_dim,)
+        assert x.shape == (self.x_dim,) and u.shape == (self.u_dim,)
         net_out, new_state = self._state_dynamics_train_one(params, stats, x, data_stats)
         return net_out + self._norm_control_affine_part(x, u, data_stats), new_state
 
@@ -530,7 +530,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
         return denormalize(mean, data_stats.xs_dot_noise_stats), denormalize_std(std, data_stats.xs_dot_noise_stats)
 
     def _initialize_parameters(self, key):
-        variables = self.model.init(key, jnp.ones(shape=(self.state_dim,)))
+        variables = self.model.init(key, jnp.ones(shape=(self.x_dim,)))
         # Split state and params (which are updated by optimizer).
         if 'params' in variables:
             state, params = variables.pop('params')
@@ -596,7 +596,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
 
     def loss(self, params, stats, xs, us, dot_xs, std_dot_xs, data_stats: DataStats):
         assert xs.shape == dot_xs.shape == std_dot_xs.shape and xs.shape[0] == us.shape[0]
-        assert xs.shape[1] == self.state_dim and us.shape[1] == self.action_dim
+        assert xs.shape[1] == self.x_dim and us.shape[1] == self.u_dim
 
         mean_batch = vmap(self._dynamics_train_one, in_axes=(None, None, 0, 0, None), out_axes=(0, 0))
         mean_batch_ensemble = vmap(mean_batch, in_axes=(0, 0, None, None, None), out_axes=(0, None),
@@ -614,7 +614,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
         norm_xs_dot = vmap(self.normalizer.normalize, in_axes=(0, None))(dot_xs, data_stats.xs_dot_noise_stats)
         norm_xs_dot_repeated = jnp.repeat(norm_xs_dot[jnp.newaxis, ...], repeats=self.num_particles, axis=0)
 
-        assert x_dot_pred.shape == (self.num_particles, xs.shape[0], self.state_dim)
+        assert x_dot_pred.shape == (self.num_particles, xs.shape[0], self.x_dim)
         assert x_dot_pred.shape == norm_xs_dot_repeated.shape == norm_stds_repeated.shape
         num_train_points = xs.shape[0]
         grad_post = jax.grad(self._neg_log_posterior)(x_dot_pred, x_batch, norm_xs_dot_repeated, norm_stds_repeated,
@@ -680,16 +680,16 @@ class fSVGDAffineDynamics(AbstractDynamics):
     We reprensent dynamics as \dot x = \a(x) + b(x)u
     """
 
-    def __init__(self, state_dim, action_dim, normalizer, features: Sequence[int], angle_layer: AngleLayerDynamics,
+    def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], angle_layer: AngleLayerDynamics,
                  prior_h=1.0, num_particles: int = 5):
-        super().__init__(state_dim=state_dim, action_dim=action_dim)
+        super().__init__(x_dim=x_dim, u_dim=u_dim)
         self.angle_layer = angle_layer
         self.num_particles = num_particles
         self.normalizer = normalizer
         self.features = features
         self.prior_h = prior_h
         # Model outputs are a (first self.state_dim dimensions) and b (last self.state_dim * self.action_dim dimensions)
-        self.model = MLP(features=self.features, output_dim=self.state_dim + self.state_dim * self.action_dim)
+        self.model = MLP(features=self.features, output_dim=self.x_dim + self.x_dim * self.u_dim)
 
         self.stein_kernel, self.stein_kernel_derivative = self._prepare_stein_kernel()
         self.prior_kernel = self._prepare_prior_kernel(h=self.prior_h)
@@ -698,22 +698,22 @@ class fSVGDAffineDynamics(AbstractDynamics):
         self.ravel_ensemble = vmap(self.ravel_one)
 
     def _dynamics_train_one(self, params, stats, x, u, data_stats: DataStats):
-        assert x.shape == (self.state_dim,) and u.shape == (self.action_dim,)
+        assert x.shape == (self.x_dim,) and u.shape == (self.u_dim,)
         expanded_x = self.angle_layer.angle_layer(x)
         expanded_x = self.normalizer.normalize(expanded_x, data_stats.xs_after_angle_layer)
         net_out, new_state = self.model.apply({'params': params, **stats}, expanded_x, mutable=list(stats.keys()),
                                               train=True)
-        a = net_out[:self.state_dim]
-        b = net_out[self.state_dim:].reshape(self.state_dim, self.action_dim)
+        a = net_out[:self.x_dim]
+        b = net_out[self.x_dim:].reshape(self.x_dim, self.u_dim)
         return a + b @ u, new_state
 
     def _dynamics_eval_one(self, params, stats, x, u, data_stats):
-        assert x.shape == (self.state_dim,) and u.shape == (self.action_dim,)
+        assert x.shape == (self.x_dim,) and u.shape == (self.u_dim,)
         expanded_x = self.angle_layer.angle_layer(x)
         expanded_x = self.normalizer.normalize(expanded_x, data_stats.xs_after_angle_layer)
         net_out = self.model.apply({'params': params, **stats}, expanded_x)
-        a = net_out[:self.state_dim]
-        b = net_out[self.state_dim:].reshape(self.state_dim, self.action_dim)
+        a = net_out[:self.x_dim]
+        b = net_out[self.x_dim:].reshape(self.x_dim, self.u_dim)
         return a + b @ u
 
     def eval_index(self, params: pytree, stats: FrozenDict, x: jax.Array, u: jax.Array,
@@ -766,7 +766,7 @@ class fSVGDAffineDynamics(AbstractDynamics):
         return denormalize(mean, data_stats.xs_dot_noise_stats), denormalize_std(std, data_stats.xs_dot_noise_stats)
 
     def _initialize_parameters(self, key):
-        init_input = self.angle_layer.angle_layer(jnp.ones(shape=(self.state_dim,)))
+        init_input = self.angle_layer.angle_layer(jnp.ones(shape=(self.x_dim,)))
         variables = self.model.init(key, init_input)
         # Split state and params (which are updated by optimizer).
         if 'params' in variables:
@@ -833,7 +833,7 @@ class fSVGDAffineDynamics(AbstractDynamics):
 
     def loss(self, params, stats, xs, us, dot_xs, std_dot_xs, data_stats: DataStats):
         assert xs.shape == dot_xs.shape == std_dot_xs.shape and xs.shape[0] == us.shape[0]
-        assert xs.shape[1] == self.state_dim and us.shape[1] == self.action_dim
+        assert xs.shape[1] == self.x_dim and us.shape[1] == self.u_dim
 
         mean_batch = vmap(self._dynamics_train_one, in_axes=(None, None, 0, 0, None), out_axes=(0, 0))
         mean_batch_ensemble = vmap(mean_batch, in_axes=(0, 0, None, None, None), out_axes=(0, None),
@@ -855,7 +855,7 @@ class fSVGDAffineDynamics(AbstractDynamics):
         norm_xs_dot = vmap(self.normalizer.normalize, in_axes=(0, None))(dot_xs, data_stats.xs_dot_noise_stats)
         norm_xs_dot_repeated = jnp.repeat(norm_xs_dot[jnp.newaxis, ...], repeats=self.num_particles, axis=0)
 
-        assert x_dot_pred.shape == (self.num_particles, xs.shape[0], self.state_dim)
+        assert x_dot_pred.shape == (self.num_particles, xs.shape[0], self.x_dim)
         assert x_dot_pred.shape == norm_xs_dot_repeated.shape == norm_stds_repeated.shape
 
         num_train_points = xs.shape[0]
@@ -918,18 +918,18 @@ class fSVGDAffineDynamics(AbstractDynamics):
 
 
 class fSVGDDynamicsMountainCar(AbstractfSVGDDynamics):
-    def __init__(self, state_dim, action_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5):
-        super().__init__(state_dim=state_dim, action_dim=action_dim, normalizer=normalizer, features=features,
+    def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5):
+        super().__init__(x_dim=x_dim, u_dim=u_dim, normalizer=normalizer, features=features,
                          num_particles=num_particles, prior_h=prior_h, )
 
     def _control_affine_part(self, x, u):
-        assert u.shape == (self.action_dim,)
+        assert u.shape == (self.u_dim,)
         return 100 * u @ jnp.array([[0.0, 0.001]], dtype=jnp.float64)
 
 
 class fSVGDDynamicsQuadrotorEuler(AbstractfSVGDDynamics):
-    def __init__(self, state_dim, action_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5):
-        super().__init__(state_dim=state_dim, action_dim=action_dim, normalizer=normalizer, features=features,
+    def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5):
+        super().__init__(x_dim=x_dim, u_dim=u_dim, normalizer=normalizer, features=features,
                          num_particles=num_particles, prior_h=prior_h, )
         self.mass = 0.18  # kg
         self.g = 9.81  # m/s^2
@@ -978,7 +978,7 @@ class fSVGDDynamicsQuadrotorEuler(AbstractfSVGDDynamics):
             jnp.array([1, 1, 1, 1, 1, 1, 1 / 10, 1 / 10, 1, 1 / 10, 1 / 10, 1], dtype=jnp.float64))
 
     def _control_affine_part(self, x, u):
-        assert u.shape == (self.action_dim,)
+        assert u.shape == (self.u_dim,)
         x = self.internal_state_scaling_inv @ x
         u = self.internal_control_scaling_inv @ u
         F, M = u[0], u[1:]
@@ -1006,9 +1006,9 @@ class fSVGDDynamicsQuadrotorEuler(AbstractfSVGDDynamics):
 
 
 class fSVGDDynamicsFurutaPendulum(AbstractfSVGDDynamics):
-    def __init__(self, state_dim, action_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5,
+    def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5,
                  system_params=jnp.array([1.0, 0.0, 1.0, 1.0, 1.0, 1.0]), g=0.2):
-        super().__init__(state_dim=state_dim, action_dim=action_dim, normalizer=normalizer, features=features,
+        super().__init__(x_dim=x_dim, u_dim=u_dim, normalizer=normalizer, features=features,
                          num_particles=num_particles, prior_h=prior_h)
         self.system_params = system_params
         self.g = g
@@ -1019,7 +1019,7 @@ class fSVGDDynamicsFurutaPendulum(AbstractfSVGDDynamics):
         self.delta = (M + 1 / 2 * m_p) * g * l_p
 
     def _control_affine_part(self, x, u):
-        assert u.shape == (self.action_dim,)
+        assert u.shape == (self.u_dim,)
         t_phi = u.reshape()
         x0_dot = 0
 
@@ -1035,9 +1035,9 @@ class fSVGDDynamicsFurutaPendulum(AbstractfSVGDDynamics):
 
 
 class fSVGDDynamicsCartpole(AbstractfSVGDDynamics):
-    def __init__(self, state_dim, action_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5,
+    def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5,
                  system_params=jnp.array([0.5, 1.0, 0.5]), g=0.2):
-        super().__init__(state_dim=state_dim, action_dim=action_dim, normalizer=normalizer, features=features,
+        super().__init__(x_dim=x_dim, u_dim=u_dim, normalizer=normalizer, features=features,
                          num_particles=num_particles, prior_h=prior_h)
         self.system_params = system_params
         self.g = g
@@ -1047,7 +1047,7 @@ class fSVGDDynamicsCartpole(AbstractfSVGDDynamics):
         self.m_p = m_p
 
     def _control_affine_part(self, x, u):
-        assert u.shape == (self.action_dim,)
+        assert u.shape == (self.u_dim,)
         x0_dot = 0
         num = jnp.cos(x[0]) * u[0]
         denom = (self.M + self.m_p * (1 - jnp.cos(x[0]) ** 2)) * self.L
@@ -1060,24 +1060,24 @@ class fSVGDDynamicsCartpole(AbstractfSVGDDynamics):
 
 
 class fSVGDDynamicsPendulum(AbstractfSVGDDynamics):
-    def __init__(self, state_dim, action_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5):
-        super().__init__(state_dim=state_dim, action_dim=action_dim, normalizer=normalizer, features=features,
+    def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5):
+        super().__init__(x_dim=x_dim, u_dim=u_dim, normalizer=normalizer, features=features,
                          num_particles=num_particles, prior_h=prior_h)
 
     def _control_affine_part(self, x, u):
-        assert u.shape == (self.action_dim,)
+        assert u.shape == (self.u_dim,)
         return u @ jnp.array([[0.0, 1.0]])
 
 
 class fSVGDDynamicsBicycle(AbstractfSVGDDynamics):
-    def __init__(self, state_dim, action_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5,
+    def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5,
                  system_params=jnp.array([1.0])):
-        super().__init__(state_dim=state_dim, action_dim=action_dim, normalizer=normalizer, features=features,
+        super().__init__(x_dim=x_dim, u_dim=u_dim, normalizer=normalizer, features=features,
                          num_particles=num_particles, prior_h=prior_h)
         self.system_params = system_params
 
     def _control_affine_part(self, x, u):
-        assert u.shape == (self.action_dim,)
+        assert u.shape == (self.u_dim,)
         x0_dot = 0
         x1_dot = 0
         x2_dot = x[3] * u[0] / self.system_params[0]
@@ -1086,22 +1086,22 @@ class fSVGDDynamicsBicycle(AbstractfSVGDDynamics):
 
 
 class fSVGDDynamicsVanDerPoolOscilator(AbstractfSVGDDynamics):
-    def __init__(self, state_dim, action_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5):
-        super().__init__(state_dim=state_dim, action_dim=action_dim, normalizer=normalizer, features=features,
+    def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5):
+        super().__init__(x_dim=x_dim, u_dim=u_dim, normalizer=normalizer, features=features,
                          num_particles=num_particles, prior_h=prior_h)
 
     def _control_affine_part(self, x, u):
-        assert u.shape == (self.action_dim,)
+        assert u.shape == (self.u_dim,)
         return u @ jnp.array([[0.0, 1.0]])
 
 
 class fSVGDDynamicsLV(AbstractfSVGDDynamics):
-    def __init__(self, state_dim, action_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5):
-        super().__init__(state_dim=state_dim, action_dim=action_dim, normalizer=normalizer, features=features,
+    def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], prior_h=1.0, num_particles: int = 5):
+        super().__init__(x_dim=x_dim, u_dim=u_dim, normalizer=normalizer, features=features,
                          num_particles=num_particles, prior_h=prior_h)
 
     def _control_affine_part(self, x, u):
-        assert u.shape == (self.action_dim,)
+        assert u.shape == (self.u_dim,)
         return u
 
 

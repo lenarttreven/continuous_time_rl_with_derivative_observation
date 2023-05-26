@@ -27,37 +27,44 @@ class MPCTracking(Policy):
                  offline_planner: AbstractOfflinePlanner, scaling: Scaling):
         super(MPCTracking, self).__init__(x_dim, u_dim, initial_conditions, normalizer, offline_planner,
                                           interaction_config, angle_layer, scaling)
-        self.mpc_tracker = MPCTracker(x_dim, u_dim, interaction_config.angles_dim, scaling,
-                                      dynamics, offline_planner.simulator_costs,
-                                      interaction_config.policy.online_tracking)
+        self.mpc_tracker = MPCTracker(x_dim=x_dim, u_dim=u_dim, scaling=scaling, dynamics=dynamics,
+                                      simulator_costs=offline_planner.simulator_costs,
+                                      interaction_config=interaction_config)
 
         self.dynamics = dynamics
         self.planner = get_planner(offline_planner, control_config=interaction_config)
-        self.dt = self.interaction_config.policy.online_tracking.mpc_dt
 
-    def update_mpc_for_cond(self, x, t, events: IntegrationCarry, tracking_data, dynamics_model: DynamicsModel):
-        new_next_update_time = t.reshape() + self.dt
+        self.period = self.interaction_config.policy.online_tracking.mpc_update_period
+
+    def update_mpc_for_cond(self, x_k: chex.Array, t_k: chex.Array, events: IntegrationCarry, tracking_data,
+                            dynamics_model: DynamicsModel) -> IntegrationCarry:
+        next_update_idx = t_k + self.period
         new_key, subkey = random.split(events.mpc_carry.key)
-        new_true_policy = self.mpc_tracker.update_mpc(x, t, tracking_data, events.mpc_carry.mpc_params, dynamics_model)
-        new_mpc_carry = MPCCarry(next_update_time=new_next_update_time, key=subkey,
+        new_true_policy = self.mpc_tracker.update_mpc(x_k, t_k, tracking_data, events.mpc_carry.mpc_params,
+                                                      dynamics_model)
+        new_mpc_carry = MPCCarry(next_update_time=next_update_idx, key=subkey,
                                  mpc_params=events.mpc_carry.mpc_params, true_policy=new_true_policy)
         new_events = IntegrationCarry(mpc_carry=new_mpc_carry, collector_carry=events.collector_carry)
         return new_events
 
     @staticmethod
-    def no_update_mpc_for_cond(x, t, events: IntegrationCarry, tracking_data, dynamics_model: DynamicsModel):
+    def no_update_mpc_for_cond(x_k: chex.Array, t_k: chex.Array, events: IntegrationCarry, tracking_data,
+                               dynamics_model: DynamicsModel) -> IntegrationCarry:
         return events
 
-    def episode_zero(self, x, t, events, tracking_data, dynamics_model: DynamicsModel):
-        return self.initial_control(x, t), events
+    def episode_zero(self, x_k: chex.Array, t_k: chex.Array, events, tracking_data,
+                     dynamics_model: DynamicsModel) -> PolicyOut:
+        return self.initial_control(x_k, t_k), events
 
-    def other_episode(self, x, t, events: IntegrationCarry, tracking_data, dynamics_model: DynamicsModel):
-        new_events = cond(t.reshape() >= events.mpc_carry.next_update_time, self.update_mpc_for_cond,
-                          self.no_update_mpc_for_cond, x, t, events, tracking_data, dynamics_model)
-        return new_events.mpc_carry.true_policy(t.reshape()), new_events
+    def other_episode(self, x_k: chex.Array, t_k: chex.Array, events: IntegrationCarry, tracking_data,
+                      dynamics_model: DynamicsModel) -> PolicyOut:
+        assert x_k.shape == (self.dynamics.x_dim,) and t_k.shape == () and t_k.dtype == jnp.int32
+        new_events = cond(t_k == events.mpc_carry.next_update_time, self.update_mpc_for_cond,
+                          self.no_update_mpc_for_cond, x_k, t_k, events, tracking_data, dynamics_model)
+        return new_events.mpc_carry.true_policy(t_k), new_events
 
-    def apply(self, x: chex.Array, t: chex.Array, tracking_data, dynamics_model, traj_idx, events) -> PolicyOut:
-        u, new_events = cond(dynamics_model.episode == 0, self.episode_zero, self.other_episode, x, t, events,
+    def apply(self, x_k: chex.Array, t_k: chex.Array, tracking_data, dynamics_model, traj_idx, events) -> PolicyOut:
+        u, new_events = cond(dynamics_model.episode == 0, self.episode_zero, self.other_episode, x_k, t_k, events,
                              tree_map(lambda z: z[traj_idx], tracking_data), dynamics_model)
         return u, new_events
 
@@ -74,13 +81,13 @@ class MPCTracking(Policy):
                                      us=offline_planning_data.us, final_t=offline_planning_data.final_t,
                                      target_x=offline_planning_data.target_x, target_u=offline_planning_data.target_u)
 
-        next_update_time = jnp.zeros(shape=(self.num_traj,))
+        next_update_time = jnp.zeros(shape=(self.num_traj,), dtype=jnp.int32)
         mpc_parameters = MPCParameters(dynamics_id=offline_planning_data.dynamics_ids)
 
-        ts_init = jnp.linspace(0, 1, self.mpc_tracker.mpc_tracker.num_nodes).reshape(-1, 1)
-        true_policy = TruePolicy(ts=jnp.repeat(ts_init[jnp.newaxis, ...], repeats=self.num_traj, axis=0),
-                                 us=jnp.zeros(
-                                     shape=(self.num_traj, self.mpc_tracker.mpc_tracker.num_nodes, self.control_dim)))
+        num_tracking_nodes = self.mpc_tracker.mpc_tracker.num_nodes - 1
+        ts_init = jnp.arange(num_tracking_nodes)
+        true_policy = TruePolicy(ts_idx=jnp.repeat(ts_init[jnp.newaxis, ...], repeats=self.num_traj, axis=0),
+                                 us=jnp.zeros(shape=(self.num_traj, num_tracking_nodes, self.u_dim)))
 
         keys = random.split(key, self.num_traj)
         mpc_carry = MPCCarry(next_update_time=next_update_time, key=keys, mpc_params=mpc_parameters,

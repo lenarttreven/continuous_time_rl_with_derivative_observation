@@ -33,19 +33,17 @@ class MPCParameters(NamedTuple):
 
 
 class TruePolicy(NamedTuple):
-    ts: jax.Array
-    us: jax.Array
+    ts_idx: chex.Array
+    us: chex.Array
 
     @jit
-    def __call__(self, t):
-        assert t.shape == ()
-        ts = self.ts.reshape(-1)
-        us = self.us
-        # We add -1 here
-        return us[jnp.digitize(t, ts, right=False) - 1]
+    def __call__(self, t_idx):
+        assert t_idx.shape == () and self.ts_idx[0] <= t_idx <= self.ts_idx[-1]
+        return self.us[t_idx - self.ts_idx[0]]
 
 
 class TrackingData(NamedTuple):
+    # ts is the time points at which the tracking data (xs, us) is available
     ts: jax.Array
     xs: jax.Array
     us: jax.Array
@@ -67,27 +65,8 @@ class TrackingData(NamedTuple):
         t = dt * num_over / (self.final_t - self.ts[-1])
         x_k = (1 - t) * self.xs[-1] + t * self.target_x
         u_k = (1 - t) * self.us[-1] + t * self.target_u
-        t_k = self.final_t + num_over * dt
+        t_k = self.ts[-1] + num_over * dt
         return x_k, u_k, t_k
-
-
-# class TrackingData(NamedTuple):
-#     ts: jax.Array
-#     xs: jax.Array
-#     us: jax.Array
-#
-#     final_t: jax.Array
-#     target_x: jax.Array
-#     target_u: jax.Array
-#
-#     # Todo: need to rewrite this to the discrete version
-#     def __call__(self, t):
-#         assert t.shape == (1,)
-#         to_return_x = MultivariateConnectingSpline(self.ts, self.xs, self.final_t.reshape(1), self.target_x)(
-#             t.reshape())
-#         to_return_u = MultivariateConnectingSpline(self.ts, self.us, self.final_t.reshape(1), self.target_u)(
-#             t.reshape())
-#         return to_return_x, to_return_u
 
 
 class PlotOpenLoop(NamedTuple):
