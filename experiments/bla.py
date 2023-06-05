@@ -10,5 +10,5 @@ class Parameters:
 
 parameters = Parameters(
     x=3,
-    y='test',
+    y="test",
 )

@@ -13,4 +13,4 @@ def get_offline_planner(exploration_strategy: ExplorationStrategy):
         # elif exploration_strategy == ExplorationStrategy.MEAN:
         #     return MeanOfflinePlanner
         case _:
-            raise NotImplementedError('This strategy has not been implemented yet.')
+            raise NotImplementedError("This strategy has not been implemented yet.")
