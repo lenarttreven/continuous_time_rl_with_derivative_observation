@@ -27,12 +27,15 @@ def get_weight_decay(wd_type: WeightDecayType, kwargs: dict) -> Schedule:
     return weight_decay
 
 
-def transition_between_values(transition_start, step_size, decay_steps, final_step_size, power=1.0) -> Schedule:
+def transition_between_values(
+    transition_start, step_size, decay_steps, final_step_size, power=1.0
+) -> Schedule:
     initial_value = constant(step_size)
     later_value = polynomial_decay(step_size, decay_steps, final_step_size, power=power)
 
     def schedule(i):
         return indicator(transition_start - i) * initial_value(i) + indicator(
-            i - transition_start) * later_value(i - transition_start)
+            i - transition_start
+        ) * later_value(i - transition_start)
 
     return schedule

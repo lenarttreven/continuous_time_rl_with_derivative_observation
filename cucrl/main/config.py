@@ -6,8 +6,18 @@ from jax import random, numpy as jnp
 from cucrl.schedules.betas import BetasType
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.representatives import BetaType, BNNTypes, BatchStrategy
-from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, TimeHorizonType
-from cucrl.utils.representatives import SmootherType, ExplorationStrategy, DynamicsTracking, MinimizationMethod
+from cucrl.utils.representatives import (
+    Optimizer,
+    Dynamics,
+    SimulatorType,
+    TimeHorizonType,
+)
+from cucrl.utils.representatives import (
+    SmootherType,
+    ExplorationStrategy,
+    DynamicsTracking,
+    MinimizationMethod,
+)
 
 
 class Scaling(NamedTuple):

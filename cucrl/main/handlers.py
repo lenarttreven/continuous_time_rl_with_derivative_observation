@@ -42,33 +42,51 @@ class DataRepr(NamedTuple):
 class DataGenerator:
     def __init__(self, data_generation: DataGeneratorConfig, interactor: Interactor):
         self.initial_conditions = data_generation.data_collection.initial_conditions
-        self.num_visualization_points = data_generation.data_collection.num_visualization_points
+        self.num_visualization_points = (
+            data_generation.data_collection.num_visualization_points
+        )
         self.state_dim = self.initial_conditions[0].size
         self.control_dim = data_generation.control_dim
         self.stacked_initial_conditions = jnp.stack(self.initial_conditions)
 
         self.num_trajectories = len(self.initial_conditions)
         self.time_horizon = data_generation.simulator.time_horizon
-        self.visualization_times_whole_horizon = jnp.linspace(*self.time_horizon,
-                                                              self.num_visualization_points).reshape(-1, 1)
+        self.visualization_times_whole_horizon = jnp.linspace(
+            *self.time_horizon, self.num_visualization_points
+        ).reshape(-1, 1)
         self.simulator_type = data_generation.simulator.simulator_type
         observation_noise = data_generation.data_collection.noise
-        self.simulation_noise = [None] if observation_noise is None else observation_noise
-        self.simulator = ForwardEuler(interactor=interactor, simulator_config=data_generation.simulator)
+        self.simulation_noise = (
+            [None] if observation_noise is None else observation_noise
+        )
+        self.simulator = ForwardEuler(
+            interactor=interactor, simulator_config=data_generation.simulator
+        )
 
-    def generate_trajectories(self, rng: jnp.array) -> Tuple[DataRepr, MeasurementSelection]:
+    def generate_trajectories(
+        self, rng: jnp.array
+    ) -> Tuple[DataRepr, MeasurementSelection]:
         key, subkey = jax.random.split(rng)
         # Simulate trajectory with the new policy
-        trajectories, vis_trajectories, measurement_selection = self.simulator.simulate_trajectories(
-            ics=self.initial_conditions, time_horizon=self.time_horizon, num_vis_ts=self.num_visualization_points,
-            sigmas=self.simulation_noise, key=subkey, events=self.simulator.interactor.integration_carry)
+        (
+            trajectories,
+            vis_trajectories,
+            measurement_selection,
+        ) = self.simulator.simulate_trajectories(
+            ics=self.initial_conditions,
+            time_horizon=self.time_horizon,
+            num_vis_ts=self.num_visualization_points,
+            sigmas=self.simulation_noise,
+            key=subkey,
+            events=self.simulator.interactor.integration_carry,
+        )
 
         observation_data = ObservationData(
             ts=[trajectory.ts.reshape(-1, 1) for trajectory in trajectories],
             us=[trajectory.us for trajectory in trajectories],
             xs=[trajectory.xs for trajectory in trajectories],
             xs_dot_true=[trajectory.xs_dot_true for trajectory in trajectories],
-            xs_dot_noise=[trajectory.xs_dot_noise for trajectory in trajectories]
+            xs_dot_noise=[trajectory.xs_dot_noise for trajectory in trajectories],
         )
 
         vis_trajectories = jtu.tree_map(lambda *x: jnp.stack(x), *vis_trajectories)
@@ -77,9 +95,12 @@ class DataGenerator:
             us=vis_trajectories.us,
             xs=vis_trajectories.xs,
             xs_dot_true=vis_trajectories.xs_dot_true,
-            xs_dot_noise=vis_trajectories.xs_dot_noise)
+            xs_dot_noise=vis_trajectories.xs_dot_noise,
+        )
 
-        measurement_selection = jtu.tree_map(lambda *x: jnp.stack(x), *measurement_selection)
+        measurement_selection = jtu.tree_map(
+            lambda *x: jnp.stack(x), *measurement_selection
+        )
         return DataRepr(observation_data, visualization_data), measurement_selection
 
 
@@ -100,13 +121,31 @@ class DynamicsDataManager:
         return DynamicsData(ts=ts, xs=xs, us=us, xs_dot=xs_dot, xs_dot_std=std_xs_dot)
 
     def add_data_to_permanent_pool(self, dynamics_data: DynamicsData):
-        assert dynamics_data.xs.shape == dynamics_data.xs_dot.shape == dynamics_data.xs_dot_std.shape
+        assert (
+            dynamics_data.xs.shape
+            == dynamics_data.xs_dot.shape
+            == dynamics_data.xs_dot_std.shape
+        )
         assert dynamics_data.xs.shape[0] == dynamics_data.us.shape[0]
-        assert dynamics_data.xs.shape[1] == self.state_dim and dynamics_data.us.shape[1] == self.control_dim
-        self.permanent_pool = jtu.tree_map(lambda x, y: jnp.concatenate((x, y)), self.permanent_pool, dynamics_data)
+        assert (
+            dynamics_data.xs.shape[1] == self.state_dim
+            and dynamics_data.us.shape[1] == self.control_dim
+        )
+        self.permanent_pool = jtu.tree_map(
+            lambda x, y: jnp.concatenate((x, y)), self.permanent_pool, dynamics_data
+        )
 
     def add_data_to_test_pool(self, dynamics_data: DynamicsData):
-        assert dynamics_data.xs.shape == dynamics_data.xs_dot.shape == dynamics_data.xs_dot_std.shape
+        assert (
+            dynamics_data.xs.shape
+            == dynamics_data.xs_dot.shape
+            == dynamics_data.xs_dot_std.shape
+        )
         assert dynamics_data.xs.shape[0] == dynamics_data.us.shape[0]
-        assert dynamics_data.xs.shape[1] == self.state_dim and dynamics_data.us.shape[1] == self.control_dim
-        self.test_pool = jtu.tree_map(lambda x, y: jnp.concatenate((x, y)), self.test_pool, dynamics_data)
+        assert (
+            dynamics_data.xs.shape[1] == self.state_dim
+            and dynamics_data.us.shape[1] == self.control_dim
+        )
+        self.test_pool = jtu.tree_map(
+            lambda x, y: jnp.concatenate((x, y)), self.test_pool, dynamics_data
+        )

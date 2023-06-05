@@ -4,17 +4,23 @@ import numpy as np
 from jax import vmap
 from scipy import special
 
-from cucrl.trajectory_optimization.numerical_computations.abstract_numerical_computation import NumericalComputation
+from cucrl.trajectory_optimization.numerical_computations.abstract_numerical_computation import (
+    NumericalComputation,
+)
 from cucrl.utils.helper_functions import derivative_coefficients
 
 
 class Classic(NumericalComputation):
     def __init__(self, num_nodes, time_horizon, k=2):
         super().__init__(num_nodes=num_nodes, time_horizon=time_horizon)
-        self.time = jnp.linspace(self.time_horizon[0], self.time_horizon[1], self.num_nodes)
+        self.time = jnp.linspace(
+            self.time_horizon[0], self.time_horizon[1], self.num_nodes
+        )
         self.k = k
         self.h = self.time[1] - self.time[0]
-        self.der_matrix = jnp.array(self.derivative_matrix(self.num_nodes, self.h, self.k))
+        self.der_matrix = jnp.array(
+            self.derivative_matrix(self.num_nodes, self.h, self.k)
+        )
         self.integral_vector = self._integral_vector(self.num_nodes, self.h)
         self.der_coeffs = derivative_coefficients(k)
 
@@ -35,7 +41,7 @@ class Classic(NumericalComputation):
         # First rows
         first_rows = np.zeros(shape=(center_start, n))
         for i in range(center_start):
-            first_rows[i, :k + 1] = der_coeffs[i, ...]
+            first_rows[i, : k + 1] = der_coeffs[i, ...]
         # Center
         center = np.zeros(shape=(n - 2 * center_start, n))
         rows, cols = np.indices((n - 2 * center_start, n))
@@ -45,7 +51,7 @@ class Classic(NumericalComputation):
         # Last rows
         last_rows = np.zeros(shape=(center_start, n))
         for i in range(1, center_start + 1):
-            last_rows[-i, -(k + 1):] = der_coeffs[-i, ...]
+            last_rows[-i, -(k + 1) :] = der_coeffs[-i, ...]
         full_matrix = np.concatenate([first_rows, center, last_rows])
         return full_matrix / h
 
@@ -66,7 +72,11 @@ class Classic(NumericalComputation):
     #     return integrand_spline.integral(self.time_horizon[0], self.time_horizon[1])[0]
 
     def numerical_integral(self, integrand):
-        return jnp.sum(integrand * self._weights) * (self.time_horizon[1] - self.time_horizon[0]) / 2
+        return (
+            jnp.sum(integrand * self._weights)
+            * (self.time_horizon[1] - self.time_horizon[0])
+            / 2
+        )
 
     @staticmethod
     def _nodes_lgl(n):
@@ -78,7 +88,9 @@ class Classic(NumericalComputation):
         nodes = self._nodes_lgl(n)
         w = np.zeros(0)
         for i in range(n):
-            w = np.append(w, 2 / (n * (n - 1) * self._legendre_function(nodes[i], n - 1) ** 2))
+            w = np.append(
+                w, 2 / (n * (n - 1) * self._legendre_function(nodes[i], n - 1) ** 2)
+            )
         return w
 
     @staticmethod
@@ -87,7 +99,7 @@ class Classic(NumericalComputation):
         return legendre[-1]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     num_nodes = 100
     time_horizon = (0.0, jnp.pi)
     ts = jnp.linspace(time_horizon[0], time_horizon[1], num_nodes)
@@ -96,8 +108,8 @@ if __name__ == '__main__':
 
     model = Classic(num_nodes=num_nodes, time_horizon=time_horizon)
     xs_der_num = model.numerical_derivative(xs.reshape(-1, 1)).reshape(-1)
-    plt.plot(ts, xs_der_true, label='True der')
-    plt.plot(ts, xs_der_num, label='Num der')
+    plt.plot(ts, xs_der_true, label="True der")
+    plt.plot(ts, xs_der_num, label="Num der")
     plt.legend()
     plt.show()
 

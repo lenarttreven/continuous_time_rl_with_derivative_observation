@@ -37,8 +37,14 @@ class DataLearn(NamedTuple):
 
 
 class Normalizer:
-    def __init__(self, state_dim: int, action_dim: int, angle_layer: AngleLayerDynamics,
-                 tracking_c: None | jnp.ndarray = None, num_correction=1e-6):
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        angle_layer: AngleLayerDynamics,
+        tracking_c: None | jnp.ndarray = None,
+        num_correction=1e-6,
+    ):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.num_correction = num_correction
@@ -49,13 +55,16 @@ class Normalizer:
         self.y_dim = self.tracking_c.shape[0]
 
     def compute_stats(self, data: DataLearn):
-        state_after_angle_layer = vmap(self.angle_layer.angle_layer)(data.dynamics_data.xs)
+        state_after_angle_layer = vmap(self.angle_layer.angle_layer)(
+            data.dynamics_data.xs
+        )
         return DataStats(
             ts_stats=self.normalize_stats(data.dynamics_data.ts),
             xs_stats=self.normalize_stats(data.dynamics_data.xs),
             us_stats=self.normalize_stats(data.dynamics_data.us),
             xs_dot_noise_stats=self.normalize_stats(data.dynamics_data.xs_dot),
-            xs_after_angle_layer=self.normalize_stats(state_after_angle_layer))
+            xs_after_angle_layer=self.normalize_stats(state_after_angle_layer),
+        )
 
     @partial(jax.jit, static_argnums=0)
     def normalize_c_scale(self, to_normalize: jnp.ndarray, stats: Stats):
@@ -105,11 +114,15 @@ class DataLoader:
         self.no_batching = no_batching
 
     @staticmethod
-    def _create_data_loader(data, batch_size: int, key, shuffle: bool = True, infinite: bool = True):
+    def _create_data_loader(
+        data, batch_size: int, key, shuffle: bool = True, infinite: bool = True
+    ):
         ds = tf.data.Dataset.from_tensor_slices(data)
         if shuffle:
-            seed = int(jax.random.randint(key, (1,), 0, 10 ** 8))
-            ds = ds.shuffle(buffer_size=4 * batch_size, seed=seed, reshuffle_each_iteration=True)
+            seed = int(jax.random.randint(key, (1,), 0, 10**8))
+            ds = ds.shuffle(
+                buffer_size=4 * batch_size, seed=seed, reshuffle_each_iteration=True
+            )
         if infinite:
             ds = ds.repeat()
         ds = ds.batch(batch_size)
@@ -123,16 +136,19 @@ class DataLoader:
 
     def prepare_loader(self, dataset: DataLearn, key: random.PRNGKey):
         if self.no_batching:
+
             def _return_all():
                 while True:
                     yield dataset.dynamics_data
 
             return _return_all()
-        ds_dynamics = self._create_data_loader(dataset.dynamics_data, self.batch_size.dynamics, key)
+        ds_dynamics = self._create_data_loader(
+            dataset.dynamics_data, self.batch_size.dynamics, key
+        )
         return ds_dynamics
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     num_smooth = 10
     num_vf = 20
     xs_dim = 3

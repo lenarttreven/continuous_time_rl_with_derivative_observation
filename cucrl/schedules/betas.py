@@ -54,13 +54,17 @@ def indicator(x):
     return (jnp.sign(x) + 1) / 2
 
 
-def beta_transition_between_values(transition_start, step_size, decay_steps, final_step_size, num_dim,
-                                   power=1.0) -> BetaSchedule:
+def beta_transition_between_values(
+    transition_start, step_size, decay_steps, final_step_size, num_dim, power=1.0
+) -> BetaSchedule:
     initial_beta = constant(step_size)
     later_beta = polynomial_decay(step_size, decay_steps, final_step_size, power=power)
 
     def beta_schedule(i):
-        return indicator(transition_start - i) * jnp.repeat(initial_beta(i), num_dim) + indicator(
-            i - transition_start) * jnp.repeat(later_beta(i - transition_start), num_dim)
+        return indicator(transition_start - i) * jnp.repeat(
+            initial_beta(i), num_dim
+        ) + indicator(i - transition_start) * jnp.repeat(
+            later_beta(i - transition_start), num_dim
+        )
 
     return beta_schedule

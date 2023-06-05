@@ -17,9 +17,17 @@ PolicyOut = Tuple[jax.Array, jax.Array, IntegrationCarry]
 
 
 class Policy(ABC):
-    def __init__(self, x_dim: int, u_dim: int, initial_condition: List[jnp.ndarray], normalizer: Normalizer,
-                 offline_planner: AbstractOfflinePlanner, interaction_config: InteractionConfig,
-                 angle_layer: AngleLayerDynamics, scaling: Scaling):
+    def __init__(
+        self,
+        x_dim: int,
+        u_dim: int,
+        initial_condition: List[jnp.ndarray],
+        normalizer: Normalizer,
+        offline_planner: AbstractOfflinePlanner,
+        interaction_config: InteractionConfig,
+        angle_layer: AngleLayerDynamics,
+        scaling: Scaling,
+    ):
         self.scaling = scaling
         self.x_dim = x_dim
         self.u_dim = u_dim
@@ -33,16 +41,24 @@ class Policy(ABC):
 
     def prepare_initial_control(self):
         if type(self.interaction_config.policy.initial_control) == float:
+
             def initial_control(x, t):
-                return jnp.array([self.interaction_config.policy.initial_control] * self.u_dim, dtype=jnp.float64)
+                return jnp.array(
+                    [self.interaction_config.policy.initial_control] * self.u_dim,
+                    dtype=jnp.float64,
+                )
 
             return initial_control
         elif callable(self.interaction_config.policy.initial_control):
-            outer_ts_nodes = jnp.linspace(*self.interaction_config.time_horizon,
-                                          self.interaction_config.policy.num_nodes + 1)
+            outer_ts_nodes = jnp.linspace(
+                *self.interaction_config.time_horizon,
+                self.interaction_config.policy.num_nodes + 1
+            )
 
             def initial_control(x_k, t_k):
-                return self.interaction_config.policy.initial_control(x_k, outer_ts_nodes[t_k])
+                return self.interaction_config.policy.initial_control(
+                    x_k, outer_ts_nodes[t_k]
+                )
 
             return initial_control
         elif isinstance(self.interaction_config.policy.initial_control, jnp.ndarray):
@@ -53,13 +69,24 @@ class Policy(ABC):
 
             return initial_control
         else:
-            raise NotImplementedError('This type of initial control has not been implemented yet')
+            raise NotImplementedError(
+                "This type of initial control has not been implemented yet"
+            )
 
     @abstractmethod
-    def apply(self, x: jnp.ndarray, t: jnp.ndarray, tracking_data, dynamics_model, traj_idx, events) -> PolicyOut:
+    def apply(
+        self,
+        x: jnp.ndarray,
+        t: jnp.ndarray,
+        tracking_data,
+        dynamics_model,
+        traj_idx,
+        events,
+    ) -> PolicyOut:
         pass
 
     @abstractmethod
-    def update(self, dynamics_model: DynamicsModel,
-               key: random.PRNGKey) -> Tuple[MPCCarry, OfflinePlanningData, TrackingData]:
+    def update(
+        self, dynamics_model: DynamicsModel, key: random.PRNGKey
+    ) -> Tuple[MPCCarry, OfflinePlanningData, TrackingData]:
         pass

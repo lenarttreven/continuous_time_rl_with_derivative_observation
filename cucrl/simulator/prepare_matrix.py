@@ -30,13 +30,15 @@ def create_matrix(triple, key):
     stable_part = create_stable_matrix(triple[0], subkeys[0])
     marginally_stable_part = create_marginally_stable_matrix(triple[1], subkeys[1])
     unstable_part = create_unstable_matrix(triple[2], subkeys[2])
-    whole_matrix = jsp.linalg.block_diag(stable_part, marginally_stable_part, unstable_part)
+    whole_matrix = jsp.linalg.block_diag(
+        stable_part, marginally_stable_part, unstable_part
+    )
     transition_matrix = jax.random.uniform(key=subkeys[3], shape=(dim, dim))
     transition_matrix, _, _ = jnp.linalg.svd(transition_matrix)
     return transition_matrix @ whole_matrix @ transition_matrix.T
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)
     b = create_marginally_stable_matrix(8, subkey)

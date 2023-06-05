@@ -11,7 +11,8 @@ from trajax.optimizers import ILQRHyperparams, ILQR
 from cucrl.simulator.simulator_costs import Pendulum as PendulumCost
 from cucrl.simulator.simulator_dynamics import Pendulum
 from jax.config import config
-config.update('jax_enable_x64', True)
+
+config.update("jax_enable_x64", True)
 
 simulator = Pendulum()
 simulator_cost = PendulumCost()
@@ -37,7 +38,13 @@ def integrate(x: jax.Array, u: jax.Array, length, time_span: float, num_low_step
     _dt = time_span / num_low_steps
 
     def f(_x, _):
-        x_dot = simulator.dynamics(_x, u, jnp.array(1.0).reshape(1, ))
+        x_dot = simulator.dynamics(
+            _x,
+            u,
+            jnp.array(1.0).reshape(
+                1,
+            ),
+        )
         return _x + x_dot * _dt, None
 
     x_next, _ = scan(f, x, None, length=num_low_steps)
@@ -58,7 +65,9 @@ def cost_fn(x, u, t, length):
 
 def dynamics_fn(x, u, t, length):
     assert x.shape == (x_dim,) and u.shape == (u_dim,)
-    return integrate(x, u, length=length, time_span=time_span, num_low_steps=num_low_steps)
+    return integrate(
+        x, u, length=length, time_span=time_span, num_low_steps=num_low_steps
+    )
 
 
 ilqr = ILQR(cost_fn, dynamics_fn)
@@ -71,19 +80,30 @@ dynamics_params = jnp.array(5.0)
 cost_params = dynamics_params
 
 start_time = time.time()
-out = ilqr.solve(dynamics_params, cost_params, initial_state, initial_actions, ilqr_params)
-print('Cost: ', out[2])
-print('Time taken: ', time.time() - start_time)
+out = ilqr.solve(
+    dynamics_params, cost_params, initial_state, initial_actions, ilqr_params
+)
+print("Cost: ", out[2])
+print("Time taken: ", time.time() - start_time)
 
 
 # Evaluation:
 
+
 @partial(jit, static_argnums=(3, 4))
-def integrate_eval(x: jax.Array, u: jax.Array, length, time_span: float, num_low_steps: int):
+def integrate_eval(
+    x: jax.Array, u: jax.Array, length, time_span: float, num_low_steps: int
+):
     _dt = time_span / num_low_steps
 
     def f(_x, _):
-        x_dot = simulator.dynamics(_x, u, jnp.array(1.0).reshape(1, ))
+        x_dot = simulator.dynamics(
+            _x,
+            u,
+            jnp.array(1.0).reshape(
+                1,
+            ),
+        )
         _x_next = _x + x_dot * _dt
         return _x_next, _x_next
 
@@ -93,7 +113,9 @@ def integrate_eval(x: jax.Array, u: jax.Array, length, time_span: float, num_low
 
 def dynamics_fn_eval(x, u, length):
     assert x.shape == (x_dim,) and u.shape == (u_dim,)
-    return integrate_eval(x, u, length=length, time_span=time_span, num_low_steps=num_low_steps)
+    return integrate_eval(
+        x, u, length=length, time_span=time_span, num_low_steps=num_low_steps
+    )
 
 
 def rollout_eval(U, x0, length):
@@ -129,8 +151,11 @@ def cost_fn_eval(xs, us):
 
 
 true_cost = cost_fn_eval(xs_all, us_all)
-print('True cost: ', true_cost)
-print(us_all.shape, xs_all.shape,)
+print("True cost: ", true_cost)
+print(
+    us_all.shape,
+    xs_all.shape,
+)
 
 # ts_eval = jnp.linspace(0, T, num_low_steps * num_action_points + 1)
 # plt.plot(ts_eval, xs_all, label='xs')

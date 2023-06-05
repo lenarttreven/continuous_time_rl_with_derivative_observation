@@ -17,8 +17,13 @@ class _IntegrateCarry(NamedTuple):
 
 
 class BestPossibleDiscreteAlgorithm:
-    def __init__(self, simulator_dynamics: SimulatorDynamics, simulator_costs: SimulatorCostsAndConstraints,
-                 time_horizon: Tuple[float, float], num_nodes: int):
+    def __init__(
+        self,
+        simulator_dynamics: SimulatorDynamics,
+        simulator_costs: SimulatorCostsAndConstraints,
+        time_horizon: Tuple[float, float],
+        num_nodes: int,
+    ):
         self.simulator_dynamics = simulator_dynamics
         self.simulator_cost = simulator_costs
         self.time_horizon = time_horizon
@@ -27,9 +32,13 @@ class BestPossibleDiscreteAlgorithm:
         self.num_action_nodes = self.num_nodes - 1
         self.dt = (self.time_horizon[1] - self.time_horizon[0]) / self.num_action_nodes
 
-        self.initial_actions = jnp.zeros(shape=(self.num_action_nodes, self.simulator_dynamics.control_dim))
+        self.initial_actions = jnp.zeros(
+            shape=(self.num_action_nodes, self.simulator_dynamics.control_dim)
+        )
 
-        self.initial_actions = -0.01 * jnp.ones(shape=(self.num_action_nodes, self.simulator_dynamics.control_dim))
+        self.initial_actions = -0.01 * jnp.ones(
+            shape=(self.num_action_nodes, self.simulator_dynamics.control_dim)
+        )
 
         self.num_low_steps = 50
         self.time_span = self.dt
@@ -37,10 +46,19 @@ class BestPossibleDiscreteAlgorithm:
         self.ilqr = ILQR(self.cost_fn, self.dynamics_fn)
         self.ilqr_params = ILQRHyperparams(maxiter=1000, psd_delta=1e0, make_psd=False)
         # CEM
-        self.cem_params = CEMHyperparams(max_iter=10, num_samples=400, elite_portion=0.1, evolution_smoothing=0.0,
-                                         sampling_smoothing=0.0)
-        self.max_control = 10 * jnp.ones(shape=(self.simulator_dynamics.control_dim,), dtype=jnp.float64)
-        self.min_control = -10 * jnp.ones(shape=(self.simulator_dynamics.control_dim,), dtype=jnp.float64)
+        self.cem_params = CEMHyperparams(
+            max_iter=10,
+            num_samples=400,
+            elite_portion=0.1,
+            evolution_smoothing=0.0,
+            sampling_smoothing=0.0,
+        )
+        self.max_control = 10 * jnp.ones(
+            shape=(self.simulator_dynamics.control_dim,), dtype=jnp.float64
+        )
+        self.min_control = -10 * jnp.ones(
+            shape=(self.simulator_dynamics.control_dim,), dtype=jnp.float64
+        )
         self.cem = CEM(self.cost_fn, self.dynamics_fn)
 
         self.eval_dt = self.dt / self.num_low_steps
@@ -52,7 +70,13 @@ class BestPossibleDiscreteAlgorithm:
         xt = _IntegrateCarry(x, t * self.dt)
 
         def f(_xt: _IntegrateCarry, _):
-            x_dot = self.simulator_dynamics.dynamics(_xt.x, u, _xt.t.reshape(1, ))
+            x_dot = self.simulator_dynamics.dynamics(
+                _xt.x,
+                u,
+                _xt.t.reshape(
+                    1,
+                ),
+            )
             x_next = _xt.x + x_dot * _dt
             t_next = _xt.t + _dt
             return _IntegrateCarry(x_next, t_next), None
@@ -61,7 +85,9 @@ class BestPossibleDiscreteAlgorithm:
         return xt_next.x
 
     def cost_fn(self, x, u, t, params=None):
-        assert x.shape == (self.simulator_dynamics.state_dim,) and u.shape == (self.simulator_dynamics.control_dim,)
+        assert x.shape == (self.simulator_dynamics.state_dim,) and u.shape == (
+            self.simulator_dynamics.control_dim,
+        )
 
         def running_cost(x, u, t):
             return self.dt * self.simulator_cost.running_cost(x, u)
@@ -72,11 +98,15 @@ class BestPossibleDiscreteAlgorithm:
         return cond(t == self.num_action_nodes, terminal_cost, running_cost, x, u, t)
 
     def dynamics_fn(self, x, u, t, params=None):
-        assert x.shape == (self.simulator_dynamics.state_dim,) and u.shape == (self.simulator_dynamics.control_dim,)
+        assert x.shape == (self.simulator_dynamics.state_dim,) and u.shape == (
+            self.simulator_dynamics.control_dim,
+        )
         return self.integrate(x, u, t)
 
     def get_optimal_cost(self, initial_state):
-        out = self.ilqr.solve(None, None, initial_state, self.initial_actions, self.ilqr_params)
+        out = self.ilqr.solve(
+            None, None, initial_state, self.initial_actions, self.ilqr_params
+        )
         # cem_out = self.cem.solve(None, None, initial_state, self.initial_actions, control_low=self.min_control,
         #                          control_high=self.max_control, hyperparams=self.cem_params,
         #                          random_key=jax.random.PRNGKey(0))
@@ -104,7 +134,9 @@ class BestPossibleDiscreteAlgorithm:
 
         self.best_xs_all = xs_all
         self.best_us_all = us_all
-        self.ts_all = jnp.linspace(self.time_horizon[0], self.time_horizon[1], xs_all.shape[0])
+        self.ts_all = jnp.linspace(
+            self.time_horizon[0], self.time_horizon[1], xs_all.shape[0]
+        )
 
         true_cost = self.cost_fn_eval(xs_all, us_all)
         return true_cost
@@ -117,7 +149,13 @@ class BestPossibleDiscreteAlgorithm:
         xt = _IntegrateCarry(x, t * self.dt)
 
         def f(_xt: _IntegrateCarry, _):
-            x_dot = self.simulator_dynamics.dynamics(_xt.x, u, _xt.t.reshape(1, ))
+            x_dot = self.simulator_dynamics.dynamics(
+                _xt.x,
+                u,
+                _xt.t.reshape(
+                    1,
+                ),
+            )
             x_next = _xt.x + x_dot * _dt
             t_next = _xt.t + _dt
             return _IntegrateCarry(x_next, t_next), x_next
@@ -126,7 +164,9 @@ class BestPossibleDiscreteAlgorithm:
         return xt_next.x, xs_next
 
     def dynamics_fn_eval(self, x, u, t):
-        assert x.shape == (self.simulator_dynamics.state_dim,) and u.shape == (self.simulator_dynamics.control_dim,)
+        assert x.shape == (self.simulator_dynamics.state_dim,) and u.shape == (
+            self.simulator_dynamics.control_dim,
+        )
         return self.integrate_eval(x, u, t)
 
     def rollout_eval(self, U, x0):
@@ -153,11 +193,11 @@ class BestPossibleDiscreteAlgorithm:
         return _running_cost + _terminal_cost
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from jax.config import config
     import matplotlib.pyplot as plt
 
-    config.update('jax_enable_x64', True)
+    config.update("jax_enable_x64", True)
 
     # # Pendulum
     # state_scaling = jnp.diag(jnp.array([1.0, 2.0]))
@@ -188,22 +228,34 @@ if __name__ == '__main__':
 
     # Quadrotor
     from cucrl.simulator.simulator_costs import QuadrotorEuler as QuadrotorEulerCost
-    from cucrl.simulator.simulator_dynamics import QuadrotorEuler as QuadrotorEulerDynamics
+    from cucrl.simulator.simulator_dynamics import (
+        QuadrotorEuler as QuadrotorEulerDynamics,
+    )
 
-    state_scaling = jnp.diag(jnp.array([1, 1, 1, 1, 1, 1, 10, 10, 1, 10, 10, 1], dtype=jnp.float64))
+    state_scaling = jnp.diag(
+        jnp.array([1, 1, 1, 1, 1, 1, 10, 10, 1, 10, 10, 1], dtype=jnp.float64)
+    )
     simulator_dynamics = QuadrotorEulerDynamics(state_scaling=state_scaling)
     simulator_costs = QuadrotorEulerCost(state_scaling=state_scaling)
-    best_possible_algorithm = BestPossibleDiscreteAlgorithm(simulator_dynamics, simulator_costs, time_horizon=(0, 15),
-                                                            num_nodes=20)
-    print('Best discrete cost: ',
-          best_possible_algorithm.get_optimal_cost(jnp.array([1.0, 1.0, 1.0,
-                                                              0., 0., 0.,
-                                                              0.0, 0.0, 0.0,
-                                                              0.0, 0.0, 0.0], dtype=jnp.float64)))
+    best_possible_algorithm = BestPossibleDiscreteAlgorithm(
+        simulator_dynamics, simulator_costs, time_horizon=(0, 15), num_nodes=20
+    )
+    print(
+        "Best discrete cost: ",
+        best_possible_algorithm.get_optimal_cost(
+            jnp.array(
+                [1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                dtype=jnp.float64,
+            )
+        ),
+    )
 
     plt.plot(best_possible_algorithm.ts_all, best_possible_algorithm.best_xs_all)
-    plt.title('Xs')
+    plt.title("Xs")
     plt.show()
-    plt.plot(best_possible_algorithm.ts_all[:-1], jnp.tanh(best_possible_algorithm.best_us_all))
-    plt.title('Us')
+    plt.plot(
+        best_possible_algorithm.ts_all[:-1],
+        jnp.tanh(best_possible_algorithm.best_us_all),
+    )
+    plt.title("Us")
     plt.show()

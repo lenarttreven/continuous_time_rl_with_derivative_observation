@@ -27,7 +27,12 @@ class DataTrain(Dataset):
         return len(self.my_data.xs)
 
     def __getitem__(self, index):
-        return DataRepr(**{dict_key: value[index] for dict_key, value in self.my_data._asdict().items()})
+        return DataRepr(
+            **{
+                dict_key: value[index]
+                for dict_key, value in self.my_data._asdict().items()
+            }
+        )
 
 
 # Example usage
@@ -39,10 +44,10 @@ dataset = DataTrain(input_data, target_data)
 dataloader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=jax_collate)
 
 for batch in dataloader:
-    print('Batch: ')
+    print("Batch: ")
     print(batch.xs)
 
-print('New cycle')
+print("New cycle")
 for batch in dataloader:
-    print('Batch: ')
+    print("Batch: ")
     print(batch.xs)

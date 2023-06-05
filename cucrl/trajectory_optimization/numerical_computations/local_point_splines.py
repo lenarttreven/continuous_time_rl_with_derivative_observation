@@ -2,7 +2,9 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from jax import vmap
 
-from cucrl.trajectory_optimization.numerical_computations.abstract_numerical_computation import NumericalComputation
+from cucrl.trajectory_optimization.numerical_computations.abstract_numerical_computation import (
+    NumericalComputation,
+)
 from cucrl.utils.helper_functions import moving_window
 from cucrl.utils.splines import InterpolatedUnivariateSpline, MultivariateSpline
 
@@ -17,7 +19,9 @@ class LocalPointSplines(NumericalComputation):
         super().__init__(num_nodes=num_nodes, time_horizon=time_horizon)
         assert 4 <= num_points_per_spline and num_points_per_spline % 2 == 1
         self.num_points_per_spline = num_points_per_spline
-        self.time = jnp.linspace(self.time_horizon[0], self.time_horizon[1], self.num_nodes)
+        self.time = jnp.linspace(
+            self.time_horizon[0], self.time_horizon[1], self.num_nodes
+        )
         self.reshaped_time = self.prepare_reshaped_times()
 
     def prepare_reshaped_times(self):
@@ -25,24 +29,30 @@ class LocalPointSplines(NumericalComputation):
 
     def numerical_derivative(self, states: jnp.ndarray) -> jnp.ndarray:
         # First spline
-        first_times = self.time[:self.num_points_per_spline]
-        first_states = states[:self.num_points_per_spline, ...]
+        first_times = self.time[: self.num_points_per_spline]
+        first_states = states[: self.num_points_per_spline, ...]
         first_der = MultivariateSpline(first_times, first_states).derivative(
-            self.time[:self.num_points_per_spline // 2])
+            self.time[: self.num_points_per_spline // 2]
+        )
 
         # Center spline
         reshaped_states = moving_window(states, self.num_points_per_spline)
 
         def _der(ts, xs):
-            return MultivariateSpline(ts, xs).derivative(ts[self.num_points_per_spline // 2].reshape(1, 1)).reshape(-1)
+            return (
+                MultivariateSpline(ts, xs)
+                .derivative(ts[self.num_points_per_spline // 2].reshape(1, 1))
+                .reshape(-1)
+            )
 
         center_der = vmap(_der)(self.reshaped_time, reshaped_states)
 
         # Last spline
-        last_times = self.time[-self.num_points_per_spline:]
-        last_states = states[-self.num_points_per_spline:, ...]
+        last_times = self.time[-self.num_points_per_spline :]
+        last_states = states[-self.num_points_per_spline :, ...]
         last_der = MultivariateSpline(last_times, last_states).derivative(
-            self.time[-(self.num_points_per_spline // 2):])
+            self.time[-(self.num_points_per_spline // 2) :]
+        )
 
         return jnp.concatenate([first_der, center_der, last_der])
 
@@ -51,7 +61,7 @@ class LocalPointSplines(NumericalComputation):
         return integrand_spline.integral(self.time_horizon[0], self.time_horizon[1])[0]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_num_nodes = 10
     test_time_horizon = (0, 10)
     test_ts = jnp.linspace(test_time_horizon[0], test_time_horizon[1], test_num_nodes)
@@ -60,7 +70,7 @@ if __name__ == '__main__':
     model = LocalPointSplines(num_nodes=test_num_nodes, time_horizon=test_time_horizon)
     xs_der_model = model.numerical_derivative(test_xs.reshape(-1, 1)).reshape(-1)
 
-    plt.plot(test_ts, xs_der_true, label='True der')
-    plt.plot(test_ts, xs_der_model, label='Model der')
+    plt.plot(test_ts, xs_der_true, label="True der")
+    plt.plot(test_ts, xs_der_model, label="Model der")
     plt.legend()
     plt.show()

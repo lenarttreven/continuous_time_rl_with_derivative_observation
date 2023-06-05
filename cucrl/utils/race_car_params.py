@@ -11,10 +11,10 @@ class CarParams:
     a: float = 0.0
     b: float = 0.01
     g: float = 9.81
-    d_f: float = 1.05 * .192
+    d_f: float = 1.05 * 0.192
     c_f: float = 1.2
     b_f: float = 2.579
-    d_r: float = 1. * 0.1737 * 1.2
+    d_r: float = 1.0 * 0.1737 * 1.2
     c_r: float = 1.2691
     b_r: float = 3.3852 / 1.2
     c_m_1: float = 0.287
@@ -42,7 +42,11 @@ class CarParams:
         b = self.b
         m = self.m
         l = self.l
-        i_o = m / (6 * (1 + a)) * ((a ** 3 + a ** 2 + a + 1) * (b ** 2) + (l ** 2) * (a + 3))
+        i_o = (
+            m
+            / (6 * (1 + a))
+            * ((a**3 + a**2 + a + 1) * (b**2) + (l**2) * (a + 3))
+        )
         x_com = self._get_x_com()
-        i_com = i_o - self.m * (x_com ** 2)
+        i_com = i_o - self.m * (x_com**2)
         return i_com

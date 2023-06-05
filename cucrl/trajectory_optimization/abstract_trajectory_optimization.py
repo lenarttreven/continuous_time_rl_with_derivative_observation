@@ -8,8 +8,14 @@ from cucrl.utils.classes import OCSolution, DynamicsIdentifier
 
 
 class AbstractTrajectoryOptimization(ABC):
-    def __init__(self, x_dim: int, u_dim: int, time_horizon: Tuple[float, float],
-                 dynamics: AbstractDynamics | SimulatorDynamics, simulator_costs: SimulatorCostsAndConstraints):
+    def __init__(
+        self,
+        x_dim: int,
+        u_dim: int,
+        time_horizon: Tuple[float, float],
+        dynamics: AbstractDynamics | SimulatorDynamics,
+        simulator_costs: SimulatorCostsAndConstraints,
+    ):
         self.x_dim = x_dim
         self.u_dim = u_dim
         self.time_horizon = time_horizon

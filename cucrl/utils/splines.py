@@ -10,7 +10,7 @@ from jax.tree_util import register_pytree_node_class
 
 @register_pytree_node_class
 class InterpolatedUnivariateSpline:
-    def __init__(self, x, y, k=3, endpoints='not-a-knot', coefficients=None):
+    def __init__(self, x, y, k=3, endpoints="not-a-knot", coefficients=None):
         """JAX implementation of kth-order spline interpolation.
         This class aims to reproduce scipy's InterpolatedUnivariateSpline
         functionality using JAX. Not all of the original class's features
@@ -69,11 +69,11 @@ class InterpolatedUnivariateSpline:
         # Verify inputs
         self._endpoints = endpoints
         k = int(k)
-        assert k in (1, 2, 3), 'Order k must be in {1, 2, 3}.'
+        assert k in (1, 2, 3), "Order k must be in {1, 2, 3}."
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
-        assert len(x) == len(y), 'Input arrays must be the same length.'
-        assert x.ndim == 1 and y.ndim == 1, 'Input arrays must be 1D.'
+        assert len(x) == len(y), "Input arrays must be the same length."
+        assert x.ndim == 1 and y.ndim == 1, "Input arrays must be 1D."
         n_data = len(x)
 
         # Difference vectors
@@ -84,12 +84,12 @@ class InterpolatedUnivariateSpline:
             # Build the linear system of equations depending on k
             # (No matrix necessary for k=1)
             if k == 1:
-                assert n_data > 1, 'Not enough input points for linear spline.'
+                assert n_data > 1, "Not enough input points for linear spline."
                 coefficients = p / h
 
             if k == 2:
-                assert n_data > 2, 'Not enough input points for quadratic spline.'
-                assert endpoints == 'not-a-knot'  # I have only validated this
+                assert n_data > 2, "Not enough input points for quadratic spline."
+                assert endpoints == "not-a-knot"  # I have only validated this
                 # And actually I think it's probably the best choice of border condition
 
                 # The knots are actually in between data points
@@ -114,10 +114,10 @@ class InterpolatedUnivariateSpline:
                         [
                             np.ones(1),
                             (
-                                    2 * dt[1:]
-                                    - dt[1:] ** 2 / h[1:]
-                                    - dt[:-1] ** 2 / h[:-1]
-                                    + h[:-1]
+                                2 * dt[1:]
+                                - dt[1:] ** 2 / h[1:]
+                                - dt[:-1] ** 2 / h[:-1]
+                                + h[:-1]
                             ),
                             np.ones(1),
                         ]
@@ -153,22 +153,22 @@ class InterpolatedUnivariateSpline:
                 coefficients = np.linalg.solve(A, s)
 
             if k == 3:
-                assert n_data > 3, 'Not enough input points for cubic spline.'
-                if endpoints not in ('natural', 'not-a-knot'):
-                    print('Warning : endpoints not recognized. Using natural.')
-                    endpoints = 'natural'
+                assert n_data > 3, "Not enough input points for cubic spline."
+                if endpoints not in ("natural", "not-a-knot"):
+                    print("Warning : endpoints not recognized. Using natural.")
+                    endpoints = "natural"
 
                 # Special values for the first and last equations
                 zero = array([0.0])
                 one = array([1.0])
-                A00 = one if endpoints == 'natural' else array([h[1]])
-                A01 = zero if endpoints == 'natural' else array([-(h[0] + h[1])])
-                A02 = zero if endpoints == 'natural' else array([h[0]])
-                ANN = one if endpoints == 'natural' else array([h[-2]])
+                A00 = one if endpoints == "natural" else array([h[1]])
+                A01 = zero if endpoints == "natural" else array([-(h[0] + h[1])])
+                A02 = zero if endpoints == "natural" else array([h[0]])
+                ANN = one if endpoints == "natural" else array([h[-2]])
                 AN1 = (
-                    -one if endpoints == 'natural' else array([-(h[-2] + h[-1])])
+                    -one if endpoints == "natural" else array([-(h[-2] + h[-1])])
                 )  # A[N, N-1]
-                AN2 = zero if endpoints == 'natural' else array([h[-1]])  # A[N, N-2]
+                AN2 = zero if endpoints == "natural" else array([h[-1]])  # A[N, N-2]
 
                 # Construct the tri-diagonal matrix A
                 A = np.diag(concatenate((A00, 2 * (h[:-1] + h[1:]), ANN)))
@@ -193,7 +193,7 @@ class InterpolatedUnivariateSpline:
     # Operations for flattening/unflattening representation
     def tree_flatten(self):
         children = (self._x, self._y, self._coefficients)
-        aux_data = {'endpoints': self._endpoints, 'k': self.k}
+        aux_data = {"endpoints": self._endpoints, "k": self.k}
         return (children, aux_data)
 
     @classmethod
@@ -216,11 +216,11 @@ class InterpolatedUnivariateSpline:
 
         if self.k == 2:
             t, a, b, c = self._compute_coeffs(x)
-            result = a + b * t + c * t ** 2
+            result = a + b * t + c * t**2
 
         if self.k == 3:
             t, a, b, c, d = self._compute_coeffs(x)
-            result = a + b * t + c * t ** 2 + d * t ** 3
+            result = a + b * t + c * t**2 + d * t**3
 
         return result
 
@@ -258,7 +258,7 @@ class InterpolatedUnivariateSpline:
             dt = (x - knots[:-1])[ind]
             b = coefficients[ind]
             b1 = coefficients[ind + 1]
-            a = y[ind] - b * dt - (b1 - b) * dt ** 2 / (2 * h)
+            a = y[ind] - b * dt - (b1 - b) * dt**2 / (2 * h)
             c = (b1 - b) / (2 * h)
             result = (t, a, b, c)
 
@@ -277,7 +277,7 @@ class InterpolatedUnivariateSpline:
         """Analytic nth derivative of the spline.
         The spline has derivatives up to its order k.
         """
-        assert n in range(self.k + 1), 'Invalid n.'
+        assert n in range(self.k + 1), "Invalid n."
 
         if n == 0:
             result = self.__call__(x)
@@ -299,7 +299,7 @@ class InterpolatedUnivariateSpline:
             if self.k == 3:
                 t, a, b, c, d = self._compute_coeffs(x)
                 if n == 1:
-                    result = b + 2 * c * t + 3 * d * t ** 2
+                    result = b + 2 * c * t + 3 * d * t**2
                 if n == 2:
                     result = 2 * c + 6 * d * t
                 if n == 3:
@@ -338,20 +338,20 @@ class InterpolatedUnivariateSpline:
             a = y[:-1]
             b = coefficients
             h = np.diff(knots)
-            cst = np.concatenate([np.zeros(1), np.cumsum(a * h + b * h ** 2 / 2)])
-            return cst[ind] + a[ind] * t + b[ind] * t ** 2 / 2
+            cst = np.concatenate([np.zeros(1), np.cumsum(a * h + b * h**2 / 2)])
+            return cst[ind] + a[ind] * t + b[ind] * t**2 / 2
 
         if self.k == 2:
             h = np.diff(knots)
             dt = x - knots[:-1]
             b = coefficients[:-1]
             b1 = coefficients[1:]
-            a = y - b * dt - (b1 - b) * dt ** 2 / (2 * h)
+            a = y - b * dt - (b1 - b) * dt**2 / (2 * h)
             c = (b1 - b) / (2 * h)
             cst = np.concatenate(
-                [np.zeros(1), np.cumsum(a * h + b * h ** 2 / 2 + c * h ** 3 / 3)]
+                [np.zeros(1), np.cumsum(a * h + b * h**2 / 2 + c * h**3 / 3)]
             )
-            return cst[ind] + a[ind] * t + b[ind] * t ** 2 / 2 + c[ind] * t ** 3 / 3
+            return cst[ind] + a[ind] * t + b[ind] * t**2 / 2 + c[ind] * t**3 / 3
 
         if self.k == 3:
             h = np.diff(knots)
@@ -364,15 +364,15 @@ class InterpolatedUnivariateSpline:
             cst = np.concatenate(
                 [
                     np.zeros(1),
-                    np.cumsum(a * h + b * h ** 2 / 2 + c * h ** 3 / 3 + d * h ** 4 / 4),
+                    np.cumsum(a * h + b * h**2 / 2 + c * h**3 / 3 + d * h**4 / 4),
                 ]
             )
             return (
-                    cst[ind]
-                    + a[ind] * t
-                    + b[ind] * t ** 2 / 2
-                    + c[ind] * t ** 3 / 3
-                    + d[ind] * t ** 4 / 4
+                cst[ind]
+                + a[ind] * t
+                + b[ind] * t**2 / 2
+                + c[ind] * t**3 / 3
+                + d[ind] * t**4 / 4
             )
 
     def integral(self, a, b):
@@ -404,8 +404,10 @@ class MultivariateSpline:
         self.x = x
         self.y = y
         self.num_dim = y.shape[1]
-        self.splines = [InterpolatedUnivariateSpline(x, y[:, i], endpoints='not-a-knot', k=k) for i in
-                        range(self.num_dim)]
+        self.splines = [
+            InterpolatedUnivariateSpline(x, y[:, i], endpoints="not-a-knot", k=k)
+            for i in range(self.num_dim)
+        ]
 
     def __call__(self, x):
         return np.stack([spline(x) for spline in self.splines], axis=1)
@@ -414,7 +416,10 @@ class MultivariateSpline:
         return np.stack([spline.derivative(x) for spline in self.splines], axis=1)
 
     def tree_flatten(self):
-        children = (self.y, self.x,)
+        children = (
+            self.y,
+            self.x,
+        )
         return (children, None)
 
     @classmethod
@@ -430,7 +435,9 @@ class LinearInterpolation:
         self.xs = xs
         self.fs = fs
         self.fs_der = fs_der
-        self.coeffs = vmap(self.compute_coeffs, (None, 0, 0))(self.xs, self.fs, self.fs_der)
+        self.coeffs = vmap(self.compute_coeffs, (None, 0, 0))(
+            self.xs, self.fs, self.fs_der
+        )
 
     def tree_flatten(self):
         children = (self.xs, self.fs, self.fs_der)
@@ -464,7 +471,9 @@ class CubicInterpolation:
         self.xs = xs
         self.fs = fs
         self.fs_der = fs_der
-        self.coeffs = vmap(self.compute_coeffs, (None, 0, 0))(self.xs, self.fs, self.fs_der)
+        self.coeffs = vmap(self.compute_coeffs, (None, 0, 0))(
+            self.xs, self.fs, self.fs_der
+        )
 
     def tree_flatten(self):
         children = (self.xs, self.fs, self.fs_der)
@@ -477,8 +486,10 @@ class CubicInterpolation:
     @staticmethod
     def compute_coeffs(xs, fs, fs_der):
         assert xs.shape == fs.shape == fs_der.shape == (2,)
-        first_two_rows = np.stack([xs ** 3, xs ** 2, xs, np.ones_like(xs)], axis=1)
-        last_two_rows = np.stack([3 * xs ** 2, 2 * xs, np.ones_like(xs), np.zeros_like(xs)], axis=1)
+        first_two_rows = np.stack([xs**3, xs**2, xs, np.ones_like(xs)], axis=1)
+        last_two_rows = np.stack(
+            [3 * xs**2, 2 * xs, np.ones_like(xs), np.zeros_like(xs)], axis=1
+        )
         a = np.concatenate([first_two_rows, last_two_rows])
         b = np.concatenate([fs, fs_der])
         coefs = np.linalg.solve(a, b)
@@ -486,7 +497,7 @@ class CubicInterpolation:
 
     def _one_dim(self, x, coeffs):
         assert x.shape == ()
-        return coeffs[0] * x ** 3 + coeffs[1] * x ** 2 + coeffs[2] * x + coeffs[3]
+        return coeffs[0] * x**3 + coeffs[1] * x**2 + coeffs[2] * x + coeffs[3]
 
     def __call__(self, x):
         return vmap(self._one_dim, in_axes=(None, 0))(x, self.coeffs)
@@ -503,9 +514,11 @@ class MultivariateConnectingSpline:
         self.y_target = y_target
         self.spline = MultivariateSpline(x, y, k=3)
         final_der = self.spline.derivative(x[-1].reshape(1)).reshape(-1)
-        self.connection = LinearInterpolation(xs=np.stack([x[-1], x_final.reshape()]),
-                                              fs=np.stack([y[-1], y_target.reshape(-1)], axis=1),
-                                              fs_der=np.stack([final_der, np.zeros_like(final_der)], axis=1))
+        self.connection = LinearInterpolation(
+            xs=np.stack([x[-1], x_final.reshape()]),
+            fs=np.stack([y[-1], y_target.reshape(-1)], axis=1),
+            fs_der=np.stack([final_der, np.zeros_like(final_der)], axis=1),
+        )
 
     def tree_flatten(self):
         children = (self.ts_nodes, self.xs_nodes, self.x_final, self.y_target)
@@ -523,7 +536,11 @@ class MultivariateConnectingSpline:
             return self.connection(x)
 
         def x_in_bounds(x):
-            return self.spline(x.reshape(1, )).reshape(-1)
+            return self.spline(
+                x.reshape(
+                    1,
+                )
+            ).reshape(-1)
 
         return cond(x > self.ts_nodes[-1], x_too_large, x_in_bounds, x)
 
@@ -556,7 +573,11 @@ class MultivariateSplineExt:
             return self.xs_nodes[0]
 
         def x_in_bounds(x):
-            return self.spline(x.reshape(1, )).reshape(-1)
+            return self.spline(
+                x.reshape(
+                    1,
+                )
+            ).reshape(-1)
 
         def too_large_test(x):
             return cond(x > self.ts_nodes[-1], x_too_large, x_in_bounds, x)
@@ -573,7 +594,11 @@ class MultivariateSplineExt:
             return np.zeros(shape=self.xs_nodes[0].shape)
 
         def x_in_bounds(x):
-            return self.spline.derivative(x.reshape(1, )).reshape(-1)
+            return self.spline.derivative(
+                x.reshape(
+                    1,
+                )
+            ).reshape(-1)
 
         def too_large_test(x):
             return cond(x > self.ts_nodes[-1], x_too_large, x_in_bounds, x)
@@ -583,25 +608,25 @@ class MultivariateSplineExt:
 
 def test_spline_der():
     x = np.linspace(0, 5, 50)
-    y = np.stack([np.sin(x), np.cos(x), x ** 2], axis=1)
+    y = np.stack([np.sin(x), np.cos(x), x**2], axis=1)
     spline = MultivariateSpline(x, y)
     d_ys = spline.derivative(x)
     print(d_ys.shape)
 
     for i in range(y.shape[1]):
         plt.plot(x, y[:, i])
-        plt.title('Xs')
+        plt.title("Xs")
     plt.show()
 
     for i in range(y.shape[1]):
         plt.plot(x, d_ys[:, i])
-        plt.title('Derivative Xs')
+        plt.title("Derivative Xs")
     plt.show()
 
 
 def test_spline_integral():
     x = np.linspace(0, 5, 50)
-    y = x ** 2
+    y = x**2
     spline = InterpolatedUnivariateSpline(x, y)
     integral = spline.integral(0, 5)
     print(integral)
@@ -610,7 +635,7 @@ def test_spline_integral():
 def test_jit():
     x = np.linspace(0, 5, 10)
     test_x = np.linspace(0, 5, 100)
-    y = np.stack([np.sin(x), np.cos(x), x ** 2], axis=1)
+    y = np.stack([np.sin(x), np.cos(x), x**2], axis=1)
 
     @jit
     def test(x, y, x_test):
@@ -625,7 +650,7 @@ def test_jit():
     plt.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # test_jit()
     test_spline_integral()
     # test_spline_der()

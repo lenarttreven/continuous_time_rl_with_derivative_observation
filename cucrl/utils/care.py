@@ -44,9 +44,13 @@ def continuous_controller_minimal_form(a, b, q, r):
 def _continuous_controller_minimal_form(a, b, q, r):
     block_print()
     state_dim, control_dim = b.shape
-    system = control.ss(a, b, np.eye(state_dim), np.zeros(shape=(state_dim, control_dim)))
+    system = control.ss(
+        a, b, np.eye(state_dim), np.zeros(shape=(state_dim, control_dim))
+    )
     min_system = control.minreal(system, tol=1e-8)
-    k_bar, s, e = control.lqr(min_system.A, min_system.B, min_system.C.T @ q @ min_system.C, r)
+    k_bar, s, e = control.lqr(
+        min_system.A, min_system.B, min_system.C.T @ q @ min_system.C, r
+    )
     k = k_bar @ min_system.C.T
     enable_print()
     return -k
@@ -70,7 +74,7 @@ def sda_care(a: jnp.ndarray, b: jnp.ndarray, c: jnp.ndarray, g_c: float):
     e = s_1 @ (a - g_c * jnp.eye(n) + r)
     r = jnp.eye(n) - a_i @ (a - g_c * jnp.eye(n))
     g = s_1 @ b @ r.T
-    p = - s_1.T @ c @ r
+    p = -s_1.T @ c @ r
     err = 1
     k = 0
 
@@ -96,12 +100,12 @@ def sda_care(a: jnp.ndarray, b: jnp.ndarray, c: jnp.ndarray, g_c: float):
     return init_val[3]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from jax.config import config
 
-    config.update('jax_enable_x64', True)
-    config.update('jax_debug_infs', True)
-    config.update('jax_debug_nans', True)
+    config.update("jax_enable_x64", True)
+    config.update("jax_debug_infs", True)
+    config.update("jax_debug_nans", True)
     np.set_printoptions(precision=2, suppress=True)
 
     dim_x = 4
@@ -127,4 +131,4 @@ if __name__ == '__main__':
         times.append(time.time() - start_time)
         print(jnp.sum(jnp.abs(x_s - x)))
 
-    print('Median time: ', jnp.median(jnp.array(times)))
+    print("Median time: ", jnp.median(jnp.array(times)))

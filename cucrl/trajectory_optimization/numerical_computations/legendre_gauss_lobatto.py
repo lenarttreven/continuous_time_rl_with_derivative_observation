@@ -2,7 +2,9 @@ import jax.numpy as jnp
 import numpy as np
 from scipy import special
 
-from cucrl.trajectory_optimization.numerical_computations.abstract_numerical_computation import NumericalComputation
+from cucrl.trajectory_optimization.numerical_computations.abstract_numerical_computation import (
+    NumericalComputation,
+)
 
 
 class LegendreGaussLobatto(NumericalComputation):
@@ -12,14 +14,21 @@ class LegendreGaussLobatto(NumericalComputation):
         self._nodes = jnp.array(nodes)
         self._weights = jnp.array(weights)
         self._differentiation_matrix = jnp.array(differentiation_matrix)
-        self.time = (self.time_horizon[1] - self.time_horizon[0]) * 0.5 * self._nodes + (
-                self.time_horizon[1] + self.time_horizon[0]) * 0.5
+        self.time = (
+            self.time_horizon[1] - self.time_horizon[0]
+        ) * 0.5 * self._nodes + (self.time_horizon[1] + self.time_horizon[0]) * 0.5
 
     def numerical_derivative(self, states):
-        return self._differentiation_matrix.dot(states) / ((self.time_horizon[1] - self.time_horizon[0]) * 0.5)
+        return self._differentiation_matrix.dot(states) / (
+            (self.time_horizon[1] - self.time_horizon[0]) * 0.5
+        )
 
     def numerical_integral(self, integrand):
-        return jnp.sum(integrand * self._weights) * (self.time_horizon[1] - self.time_horizon[0]) / 2
+        return (
+            jnp.sum(integrand * self._weights)
+            * (self.time_horizon[1] - self.time_horizon[0])
+            / 2
+        )
 
     @staticmethod
     def _legendre_function(x, n):
@@ -36,7 +45,9 @@ class LegendreGaussLobatto(NumericalComputation):
         nodes = self._nodes_lgl(n)
         w = np.zeros(0)
         for i in range(n):
-            w = np.append(w, 2 / (n * (n - 1) * self._legendre_function(nodes[i], n - 1) ** 2))
+            w = np.append(
+                w, 2 / (n * (n - 1) * self._legendre_function(nodes[i], n - 1) ** 2)
+            )
         return w
 
     def _differentiation_matrix_lgl(self, n):
@@ -45,9 +56,11 @@ class LegendreGaussLobatto(NumericalComputation):
         for i in range(n):
             for j in range(n):
                 if i != j:
-                    d[i, j] = self._legendre_function(tau[i], n - 1) \
-                              / self._legendre_function(tau[j], n - 1) \
-                              / (tau[i] - tau[j])
+                    d[i, j] = (
+                        self._legendre_function(tau[i], n - 1)
+                        / self._legendre_function(tau[j], n - 1)
+                        / (tau[i] - tau[j])
+                    )
                 elif i == j and i == 0:
                     d[i, j] = -n * (n - 1) * 0.25
                 elif i == j and i == n - 1:
