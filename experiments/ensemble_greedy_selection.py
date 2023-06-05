@@ -9,7 +9,7 @@ from cucrl.main.data_stats import Normalizer, Stats
 from cucrl.utils.ensembles import DeterministicEnsemble, DataStatsBNN, DataRepr
 from cucrl.utils.helper_functions import AngleLayerDynamics
 
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 
 key = random.PRNGKey(0)
 input_dim = 1
@@ -37,7 +37,7 @@ start_time = time.time()
 
 model_params, model_stats = model.fit_model(dataset=train_data, num_epochs=4000, data_stats=data_stats,
                                             data_std=data_std, batch_size=32)
-print(f"Training time: {time.time() - start_time:.2f} seconds")
+print(f'Training time: {time.time() - start_time:.2f} seconds')
 
 test_xs = jnp.linspace(0, 10, 1000).reshape(-1, 1)
 test_ys = jnp.sin(test_xs)
@@ -53,8 +53,8 @@ alpha_best = model.calculate_calibration_alpha(model_params, model_stats, test_x
 best_ps = model.calculate_calibration_score(model_params, model_stats, test_xs, test_ys, test_ys_noisy, ps,
                                             data_stats, alpha_best)
 print(best_ps.shape)
-print("Test ps: ", best_ps)
-print("Target ps: ", ps.reshape(-1, 1))
+print('Test ps: ', best_ps)
+print('Target ps: ', ps.reshape(-1, 1))
 
 apply_ens = vmap(model.apply_eval, in_axes=(None, None, 0, None))
 preds = vmap(apply_ens, in_axes=(0, 0, None, None))(model_params, model_stats, test_xs, data_stats)

@@ -124,14 +124,14 @@ class DeterministicEnsemble:
                                                             data_stats, data_std_batch, subkey,
                                                             num_train_points)
 
-            wandb.log({"loss": loss})
+            wandb.log({'loss': loss})
             if step >= num_epochs:
                 break
 
             if step % 100 == 0 or step == 1:
                 nll = self.eval_ll(params, stats, data_batch, data_stats, data_std_batch, num_train_points)
 
-                print(f"Step {step}, nll: {nll}")
+                print(f'Step {step}, nll: {nll}')
 
         return params, stats
 
@@ -229,13 +229,13 @@ if __name__ == '__main__':
     start_time = time.time()
     print('Starting with training')
     wandb.init(
-        project="Pendulum",
+        project='Pendulum',
         group='test group',
     )
 
     model_params, model_stats = model.fit_model(dataset=train_data, num_epochs=5000, data_stats=data_stats,
                                                 data_std=data_std, batch_size=32)
-    print(f"Training time: {time.time() - start_time:.2f} seconds")
+    print(f'Training time: {time.time() - start_time:.2f} seconds')
 
     test_xs = jnp.linspace(-5, 15, 1000).reshape(-1, 1)
     test_ys = jnp.concatenate([jnp.sin(test_xs), jnp.cos(test_xs)], axis=1)
@@ -252,8 +252,8 @@ if __name__ == '__main__':
     test_ps = model.calculate_calibration_score(model_params, model_stats, test_xs, test_ys, test_ys_noisy, ps,
                                                 data_stats, alpha_best)
     print(test_ps.shape)
-    print("Test ps: ", test_ps)
-    print("Target ps: ", ps.reshape(-1, 1))
+    print('Test ps: ', test_ps)
+    print('Target ps: ', ps.reshape(-1, 1))
 
     apply_ens = vmap(model.apply_eval, in_axes=(None, None, 0, None))
     preds = vmap(apply_ens, in_axes=(0, 0, None, None))(model_params, model_stats, test_xs, data_stats)

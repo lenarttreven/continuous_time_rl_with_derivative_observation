@@ -10,7 +10,7 @@ from jax.tree_util import register_pytree_node_class
 
 @register_pytree_node_class
 class InterpolatedUnivariateSpline(object):
-    def __init__(self, x, y, k=3, endpoints="not-a-knot", coefficients=None):
+    def __init__(self, x, y, k=3, endpoints='not-a-knot', coefficients=None):
         """JAX implementation of kth-order spline interpolation.
         This class aims to reproduce scipy's InterpolatedUnivariateSpline
         functionality using JAX. Not all of the original class's features
@@ -69,11 +69,11 @@ class InterpolatedUnivariateSpline(object):
         # Verify inputs
         self._endpoints = endpoints
         k = int(k)
-        assert k in (1, 2, 3), "Order k must be in {1, 2, 3}."
+        assert k in (1, 2, 3), 'Order k must be in {1, 2, 3}.'
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
-        assert len(x) == len(y), "Input arrays must be the same length."
-        assert x.ndim == 1 and y.ndim == 1, "Input arrays must be 1D."
+        assert len(x) == len(y), 'Input arrays must be the same length.'
+        assert x.ndim == 1 and y.ndim == 1, 'Input arrays must be 1D.'
         n_data = len(x)
 
         # Difference vectors
@@ -84,12 +84,12 @@ class InterpolatedUnivariateSpline(object):
             # Build the linear system of equations depending on k
             # (No matrix necessary for k=1)
             if k == 1:
-                assert n_data > 1, "Not enough input points for linear spline."
+                assert n_data > 1, 'Not enough input points for linear spline.'
                 coefficients = p / h
 
             if k == 2:
-                assert n_data > 2, "Not enough input points for quadratic spline."
-                assert endpoints == "not-a-knot"  # I have only validated this
+                assert n_data > 2, 'Not enough input points for quadratic spline.'
+                assert endpoints == 'not-a-knot'  # I have only validated this
                 # And actually I think it's probably the best choice of border condition
 
                 # The knots are actually in between data points
@@ -153,22 +153,22 @@ class InterpolatedUnivariateSpline(object):
                 coefficients = np.linalg.solve(A, s)
 
             if k == 3:
-                assert n_data > 3, "Not enough input points for cubic spline."
-                if endpoints not in ("natural", "not-a-knot"):
-                    print("Warning : endpoints not recognized. Using natural.")
-                    endpoints = "natural"
+                assert n_data > 3, 'Not enough input points for cubic spline.'
+                if endpoints not in ('natural', 'not-a-knot'):
+                    print('Warning : endpoints not recognized. Using natural.')
+                    endpoints = 'natural'
 
                 # Special values for the first and last equations
                 zero = array([0.0])
                 one = array([1.0])
-                A00 = one if endpoints == "natural" else array([h[1]])
-                A01 = zero if endpoints == "natural" else array([-(h[0] + h[1])])
-                A02 = zero if endpoints == "natural" else array([h[0]])
-                ANN = one if endpoints == "natural" else array([h[-2]])
+                A00 = one if endpoints == 'natural' else array([h[1]])
+                A01 = zero if endpoints == 'natural' else array([-(h[0] + h[1])])
+                A02 = zero if endpoints == 'natural' else array([h[0]])
+                ANN = one if endpoints == 'natural' else array([h[-2]])
                 AN1 = (
-                    -one if endpoints == "natural" else array([-(h[-2] + h[-1])])
+                    -one if endpoints == 'natural' else array([-(h[-2] + h[-1])])
                 )  # A[N, N-1]
-                AN2 = zero if endpoints == "natural" else array([h[-1]])  # A[N, N-2]
+                AN2 = zero if endpoints == 'natural' else array([h[-1]])  # A[N, N-2]
 
                 # Construct the tri-diagonal matrix A
                 A = np.diag(concatenate((A00, 2 * (h[:-1] + h[1:]), ANN)))
@@ -193,7 +193,7 @@ class InterpolatedUnivariateSpline(object):
     # Operations for flattening/unflattening representation
     def tree_flatten(self):
         children = (self._x, self._y, self._coefficients)
-        aux_data = {"endpoints": self._endpoints, "k": self.k}
+        aux_data = {'endpoints': self._endpoints, 'k': self.k}
         return (children, aux_data)
 
     @classmethod
@@ -277,7 +277,7 @@ class InterpolatedUnivariateSpline(object):
         """Analytic nth derivative of the spline.
         The spline has derivatives up to its order k.
         """
-        assert n in range(self.k + 1), "Invalid n."
+        assert n in range(self.k + 1), 'Invalid n.'
 
         if n == 0:
             result = self.__call__(x)

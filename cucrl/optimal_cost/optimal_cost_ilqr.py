@@ -49,17 +49,17 @@ class OptimalCost:
         return out
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     from jax.config import config
 
-    config.update("jax_enable_x64", True)
+    config.update('jax_enable_x64', True)
     # Pendulum
     system = Pendulum()
     costs = PendulumCost()
     optimal_cost = OptimalCost(simulator_dynamics=system, simulator_costs=costs, time_horizon=(0.0, 10.0),
                                num_nodes=10000)
     out = optimal_cost.solve(jnp.array([0.5 * jnp.pi, 0]))
-    print("Pendulum optimal objective:", out)
+    print('Pendulum optimal objective:', out)
 
     # Bicycle
     system = Bicycle()
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     optimal_cost = OptimalCost(simulator_dynamics=system, simulator_costs=costs, time_horizon=(0.0, 10.0),
                                num_nodes=10000)
     out = optimal_cost.solve(jnp.array([0.0, 0.0, 0.0, 0.0]))
-    print("Bicycle optimal objective:", out)
+    print('Bicycle optimal objective:', out)
 
     # RaceCar
     system = RaceCar()
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     optimal_cost = OptimalCost(simulator_dynamics=system, simulator_costs=costs, time_horizon=(0.0, 10.0),
                                num_nodes=10000)
     out = optimal_cost.solve(jnp.array([0, 0, 0, 0, 0, 0], dtype=jnp.float64))
-    print("RaceCar optimal objective:", out)
+    print('RaceCar optimal objective:', out)
 
     # FurutaPendulum
     system = FurutaPendulum()
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     optimal_cost = OptimalCost(simulator_dynamics=system, simulator_costs=costs, time_horizon=(0.0, 10.0),
                                num_nodes=10000)
     out = optimal_cost.solve(jnp.array([0.0, 0.0, jnp.pi, 0.0], dtype=jnp.float64))
-    print("FurutaPendulum optimal objective:", out)
+    print('FurutaPendulum optimal objective:', out)
 
     # MountainCar
     system = MountainCar()
@@ -91,4 +91,4 @@ if __name__ == "__main__":
     optimal_cost = OptimalCost(simulator_dynamics=system, simulator_costs=costs, time_horizon=(0.0, 10.0),
                                num_nodes=10000)
     out = optimal_cost.solve(jnp.array([-jnp.pi / 6, 0.0]))
-    print("MountainCar optimal objective:", out)
+    print('MountainCar optimal objective:', out)

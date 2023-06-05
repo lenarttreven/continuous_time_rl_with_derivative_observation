@@ -208,7 +208,7 @@ class GPOfflinePlanner(AbstractTrajectoryOptimization):
     def solve(self, dynamics_parameters, model_states, dynamics_key, initial_conditions,
               initial_parameters: OfflinePlanningParams, data_stats):
         if initial_parameters.use_eta:
-            raise NotImplementedError("This type of exploration is not supported")
+            raise NotImplementedError('This type of exploration is not supported')
         else:
             eta = random.normal(key=initial_parameters.eta_key, shape=(self.num_nodes * self.x_dim,))
             params_for_opt = jnp.concatenate([eta, initial_parameters.xs_and_us_params])

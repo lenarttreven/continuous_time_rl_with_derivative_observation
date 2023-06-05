@@ -125,7 +125,7 @@ class LearnSystem:
                                      dynamics_config=dynamics,
                                      angle_layer=self.angle_layer,
                                      measurement_collection_config=self.config.interaction.measurement_collector)
-        print("Time for dynamics preparation: ", time.time() - time_dynamics)
+        print('Time for dynamics preparation: ', time.time() - time_dynamics)
 
     def _prepare_controller(self, control_options, initial_condition):
         self.policy = get_interactor(self.x_dim, self.u_dim, self.dynamics, initial_condition,
@@ -164,7 +164,7 @@ class LearnSystem:
         trajs = true_data_gen.generate_trajectories(key)
         costs = vmap(self.compute_cost)(trajs[0].visualization_data.ts, trajs[0].visualization_data.xs,
                                         trajs[0].visualization_data.us)
-        print("Optimal costs: ", costs)
+        print('Optimal costs: ', costs)
         return costs
 
     def _initialize_parameters(self):
@@ -175,7 +175,7 @@ class LearnSystem:
         # Initialize parameters
         params_dynamics, stats_dynamics = self.dynamics.initialize_parameters(keys[0])
 
-        self.parameters = {"dynamics": params_dynamics}
+        self.parameters = {'dynamics': params_dynamics}
         self.stats = {'dynamics': stats_dynamics}
 
         self.old_parameters = copy.deepcopy(self.parameters)
@@ -188,7 +188,7 @@ class LearnSystem:
             self.num_dynamics_parameters += leave.size
 
         self.num_parameters = self.num_dynamics_parameters
-        print("Time to initialize parameters", time.time() - time_parameters)
+        print('Time to initialize parameters', time.time() - time_parameters)
 
     def _reset_parameters_dynamics(self, key):
         params_dynamics, states_dynamics = self.dynamics.initialize_parameters(key)
@@ -202,7 +202,7 @@ class LearnSystem:
 
         self.dynamics_training = objectives.dynamics_training
         self.values_and_grad_dynamics_training = jit(value_and_grad(self.dynamics_training, 0, has_aux=True))
-        print("Time to prepare objective builder", time.time() - time_objective_builder)
+        print('Time to prepare objective builder', time.time() - time_objective_builder)
 
     def _prepare_offline_planner(self):
         policy_config = self.interaction.policy
@@ -229,10 +229,10 @@ class LearnSystem:
 
     def prepare_dynamics_training(self):
         if self.track_wandb:
-            wandb.define_metric("x_axis/step")
+            wandb.define_metric('x_axis/step')
             # set all other train/ metrics to use this step
-            wandb.define_metric("Dynamics training/*", step_metric="x_axis/step", summary="last")
-            wandb.define_metric('Dynamics training/iter_time', step_metric="x_axis/step", summary='mean')
+            wandb.define_metric('Dynamics training/*', step_metric='x_axis/step', summary='last')
+            wandb.define_metric('Dynamics training/iter_time', step_metric='x_axis/step', summary='mean')
         tx_dynamics_training = self.optimizer_dynamics_training(
             self.learning_rate_dynamics_training,
             weight_decay=self.config.optimizers.dynamics_training.wd)
@@ -289,7 +289,7 @@ class LearnSystem:
             keys = Keys(step_key=new_step_key_gen, episode_key=keys.episode_key)
             if step < 5:
                 next_time = time.time()
-                print("Time for step {}:".format(step), next_time - current_time)
+                print('Time for step {}:'.format(step), next_time - current_time)
                 current_time = next_time
 
             # Make an optimization step
@@ -306,7 +306,7 @@ class LearnSystem:
 
         # Print total training time
         time_spent_for_training = time.time() - initial_time
-        print("Time spent for training:", time_spent_for_training, "seconds")
+        print('Time spent for training:', time_spent_for_training, 'seconds')
         # Update the trained parameters and stats
         for dict_keys, value in copy.deepcopy(self.parameters).items():
             self.old_parameters[dict_keys] = value
@@ -551,7 +551,7 @@ class LearnSystem:
         directory = os.path.join(wandb.run.dir, 'data')
         if not os.path.exists(directory):
             os.makedirs(directory)
-        prefix = stage if stage == "" else stage + "_"
+        prefix = stage if stage == '' else stage + '_'
         data_path = os.path.join('data', prefix + 'data_episode_{}.pkl'.format(episode))
         data_vis_path = os.path.join('data', prefix + 'plot_data_episode_{}.pkl'.format(episode))
         with open(os.path.join(wandb.run.dir, data_path), 'wb') as handle:

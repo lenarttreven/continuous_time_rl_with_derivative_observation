@@ -12,7 +12,7 @@ XTICKS_FONTIZE = 12
 YTICKS_FONTIZE = 12
 
 q = 0.2
-data = pd.read_csv("pendulum_small_input_control.csv")
+data = pd.read_csv('pendulum_small_input_control.csv')
 groups = data['group'].unique()
 
 for group in groups:
@@ -28,16 +28,16 @@ for group in groups:
     regret_lower_quantile = np.quantile(regrets, q, axis=0)
     regret_upper_quantile = np.quantile(regrets, 1 - q, axis=0)
 
-    plt.plot(np.arange(len(regret_means)), regret_means, label=group.split(".", 1)[1])
+    plt.plot(np.arange(len(regret_means)), regret_means, label=group.split('.', 1)[1])
     plt.fill_between(np.arange(len(regret_means)), regret_lower_quantile, regret_upper_quantile, alpha=0.3)
 
-plt.ylabel("Regret", fontsize=YLABLE_FONTIZE)
-plt.xlabel("Episode", fontsize=XLABLE_FONTIZE)
+plt.ylabel('Regret', fontsize=YLABLE_FONTIZE)
+plt.xlabel('Episode', fontsize=XLABLE_FONTIZE)
 plt.xticks(fontsize=XTICKS_FONTIZE)
 plt.yticks(fontsize=YTICKS_FONTIZE)
 
 plt.legend(fontsize=LEGEND_FONTIZE)
 plt.tight_layout()
 if SAVE_FIG:
-    plt.savefig("pendulum_regret.pdf")
+    plt.savefig('pendulum_regret.pdf')
 plt.show()

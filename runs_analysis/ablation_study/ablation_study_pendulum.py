@@ -14,7 +14,7 @@ XTICKS_FONTIZE = 20
 YTICKS_FONTIZE = 20
 
 q = 0.2
-data = pd.read_csv("Ablation_study_pendulum.csv")
+data = pd.read_csv('Ablation_study_pendulum.csv')
 groups = data['group'].unique()
 
 fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
@@ -31,27 +31,27 @@ for index, mss in enumerate(MSSs):
     data_mean = data_mss[data_mss['group'].str.contains('MEAN')]
     data_optimistic = data_mss[data_mss['group'].str.contains('OPTIMISTIC')]
 
-    groupped_mean = data_mean.groupby(['episode'])[["Cost/True trajectory 0"]]
-    groupped_optimistic = data_optimistic.groupby(['episode'])[["Cost/True trajectory 0"]]
+    groupped_mean = data_mean.groupby(['episode'])[['Cost/True trajectory 0']]
+    groupped_optimistic = data_optimistic.groupby(['episode'])[['Cost/True trajectory 0']]
 
     MEAN_costs_means = groupped_mean.median().values.reshape(-1) - SUBSRTACTION
     MEAN_costs_lower_quantile = groupped_mean.quantile(q).values.reshape(-1, ) - SUBSRTACTION
     MEAN_costs_upper_quantile = groupped_mean.quantile(1 - q).values.reshape(-1, ) - SUBSRTACTION
 
-    ax.plot(np.arange(len(MEAN_costs_means)), MEAN_costs_means, label="GREEDY")
+    ax.plot(np.arange(len(MEAN_costs_means)), MEAN_costs_means, label='GREEDY')
     ax.fill_between(np.arange(len(MEAN_costs_means)), MEAN_costs_lower_quantile, MEAN_costs_upper_quantile, alpha=0.3)
 
     OPTIMISTIC_costs_means = groupped_optimistic.median().values.reshape(-1) - SUBSRTACTION
     OPTIMISTIC_costs_lower_quantile = groupped_optimistic.quantile(q).values.reshape(-1, ) - SUBSRTACTION
     OPTIMISTIC_costs_upper_quantile = groupped_optimistic.quantile(1 - q).values.reshape(-1, ) - SUBSRTACTION
 
-    ax.plot(np.arange(len(OPTIMISTIC_costs_means)), OPTIMISTIC_costs_means, label="OPTIMISM")
+    ax.plot(np.arange(len(OPTIMISTIC_costs_means)), OPTIMISTIC_costs_means, label='OPTIMISM')
     ax.fill_between(np.arange(len(OPTIMISTIC_costs_means)), OPTIMISTIC_costs_lower_quantile,
                     OPTIMISTIC_costs_upper_quantile, alpha=0.3)
 
-    ax.axhline(20.17 - SUBSRTACTION, xmin=0, xmax=20, color="black", linestyle="--", label='Best continuous',
+    ax.axhline(20.17 - SUBSRTACTION, xmin=0, xmax=20, color='black', linestyle='--', label='Best continuous',
                linewidth=4)
-    ax.axhline(20.656 - SUBSRTACTION, xmin=0, xmax=20, color="black", linestyle='dotted',
+    ax.axhline(20.656 - SUBSRTACTION, xmin=0, xmax=20, color='black', linestyle='dotted',
                label='Best discrete', linewidth=4)
 
     ax.set_title(mss, fontsize=TITLE_FONTIZE)

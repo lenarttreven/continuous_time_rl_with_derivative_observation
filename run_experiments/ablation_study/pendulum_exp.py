@@ -19,7 +19,7 @@ from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, B
 from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, BetaType
 from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 
 
 def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: BatchStrategy,
@@ -119,7 +119,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
     if track_wandb:
         home_folder = os.getcwd()
         home_folder = '/'.join(home_folder.split('/')[:4])
-        group_name = str(exploration_strategy) + "_" + str(measurement_selection_strategy)
+        group_name = str(exploration_strategy) + '_' + str(measurement_selection_strategy)
         if home_folder == '/cluster/home/trevenl':
             wandb.init(
                 dir='/cluster/scratch/trevenl',
@@ -143,7 +143,7 @@ def main(args):
     t_start = time.time()
     experiment(args.data_seed, BatchStrategy[args.measurement_selection_strategy],
                ExplorationStrategy[args.exploration_strategy], args.project_name)
-    print("Total time taken: ", time.time() - t_start, " seconds")
+    print('Total time taken: ', time.time() - t_start, ' seconds')
 
 
 if __name__ == '__main__':

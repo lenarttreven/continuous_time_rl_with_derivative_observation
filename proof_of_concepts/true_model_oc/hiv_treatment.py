@@ -6,7 +6,7 @@ from cucrl.optimal_cost.optimal_cost_ilqr import OptimalCost
 from cucrl.simulator.simulator_costs import HIVTreatment as HIVTreatmentCosts
 from cucrl.simulator.simulator_dynamics import HIVTreatment
 
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 
 
 def run():

@@ -246,7 +246,7 @@ class FurutaPendulum(SimulatorDynamics):
         """
         https://lucris.lub.lu.se/ws/files/4453844/8727127.pdf
         systems_params = (J, M, m_a, m_p, l_a, l_p)
-        Second angle x[2] is the coordinate of the angle which we want on top i.e. 0 
+        Second angle x[2] is the coordinate of the angle which we want on top i.e. 0
         """
         (J, M, m_a, m_p, l_a, l_p) = system_params
         self.alpha = J + (M + 1 / 3 * m_a + m_p) * l_a ** 2
@@ -920,5 +920,5 @@ def get_simulator_dynamics(simulator: SimulatorType, scaling: Scaling) -> Simula
         return Glucose(**scaling._asdict())
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     Pendulum()

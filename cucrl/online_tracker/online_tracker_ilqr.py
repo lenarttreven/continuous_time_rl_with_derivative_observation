@@ -69,8 +69,8 @@ class ILQROnlineTracking(AbstractOnlineTracker):
             x_dot_mean = self.dynamics.mean_eval_one(dynamics_model, x, u)
             return x_dot_mean
         else:
-            raise NotImplementedError(f"Unknown dynamics tracking: "
-                                      f"{self.interaction_config.policy.online_tracking.dynamics_tracking}")
+            raise NotImplementedError(f'Unknown dynamics tracking: '
+                                      f'{self.interaction_config.policy.online_tracking.dynamics_tracking}')
 
     def dynamics_fn(self, x_k: chex.Array, u_k: chex.Array, k: chex.Array, dynamics_ilqr: DynamicsILQR):
         # t will go over array [0, ..., num_nodes - 1]
@@ -128,7 +128,7 @@ class ILQROnlineTracking(AbstractOnlineTracker):
 
         results = self.ilqr.solve(cost_ilqr, dynamics_ilqr, initial_conditions, self.u_init, self.ilqr_hyperparams)
 
-        jax.debug.print("Objective value: {x}", x=results.obj)
+        jax.debug.print('Objective value: {x}', x=results.obj)
         xs, delta_us = results.xs, results.us
 
         xs_o, us_o = xs_track, us_track

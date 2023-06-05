@@ -10,7 +10,7 @@ from trajax.optimizers import CEMHyperparams, ILQRHyperparams, ILQR_with_CEM_war
 
 from cucrl.utils.greedy_point_selection import greedy_distance_maximization_1d_jit
 
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 
 x_dim = 2
 u_dim = 1
@@ -76,9 +76,9 @@ out = optimizer.solve(time_discretization_proposed, time_discretization_proposed
                       cem_hyperparams=cem_params, random_key=key)
 print('Cost: ', out[2])
 
-plt.plot(ts_proposed[:-1], out.xs[:-1, :], label="xs")
-plt.title("iLQR warmup")
-plt.step(ts_proposed[:-1], out.us, label="us", where='post')
+plt.plot(ts_proposed[:-1], out.xs[:-1, :], label='xs')
+plt.title('iLQR warmup')
+plt.step(ts_proposed[:-1], out.us, label='us', where='post')
 plt.legend()
 plt.show()
 
@@ -122,8 +122,8 @@ out = optimizer.solve(time_discretization, time_discretization, initial_state, i
                       cem_hyperparams=cem_params, random_key=key)
 print('Cost: ', out[2])
 
-plt.plot(ts, out.xs, label="xs")
-plt.title("iLQR warmup")
-plt.step(ts[:-1], out.us, label="us", where='post')
+plt.plot(ts, out.xs, label='xs')
+plt.title('iLQR warmup')
+plt.step(ts[:-1], out.us, label='us', where='post')
 plt.legend()
 plt.show()

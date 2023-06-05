@@ -24,4 +24,4 @@ if __name__ == '__main__':
             return x + 1
 
 
-    test = C(c=4, b="hello", a=5)
+    test = C(c=4, b='hello', a=5)

@@ -109,7 +109,7 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
             case MinimizationMethod.ILQR:
                 results = self.optimizer.solve(dynamics_model, dynamics_model, x0, initial_actions, self.ilqr_params)
             case _:
-                raise NotImplementedError(f"Minimization method {self.minimize_method} not implemented")
+                raise NotImplementedError(f'Minimization method {self.minimize_method} not implemented')
 
         us = results.us[:, :self.u_dim]
         us = jnp.concatenate([us, us[-1][None, :]])

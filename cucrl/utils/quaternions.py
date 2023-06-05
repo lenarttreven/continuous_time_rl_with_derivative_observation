@@ -43,7 +43,7 @@ class Quaternion:
         return not (self == other)
 
     def __repr__(self):
-        return "Quaternion:\n" + self.x.__repr__()
+        return 'Quaternion:\n' + self.x.__repr__()
 
     def __mul__(self, other):
         # multiplication of two quaternions.

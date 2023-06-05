@@ -18,7 +18,7 @@ from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, B
 from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, NumericalComputation, Norm, BetaType
 from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

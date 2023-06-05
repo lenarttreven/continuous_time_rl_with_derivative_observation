@@ -47,8 +47,8 @@ class Plotter:
                                               nodes_values=data.states[trajectory][:, dimension],
                                               visualization_times=data.visualization_times[trajectory].reshape(-1),
                                               node_predictions=data.state_prediction[trajectory][:, dimension])
-                ax.set_xlabel(r"t")
-                ax.set_ylabel(r"$x_{}(t, x_0)$".format('{' + str(dimension) + '}'))
+                ax.set_xlabel(r't')
+                ax.set_ylabel(r'$x_{}(t, x_0)$'.format('{' + str(dimension) + '}'))
                 if trajectory == 0 and dimension == 0:
                     handles, labels = ax.get_legend_handles_labels()
                     by_label = dict(zip(labels, handles))
@@ -62,26 +62,26 @@ class Plotter:
                                               nodes_values=data.controls[trajectory][:, dimension],
                                               visualization_times=data.visualization_times[trajectory].reshape(-1),
                                               node_predictions=data.controls_prediction[trajectory][:, dimension])
-                ax.set_xlabel(r"t")
-                ax.set_ylabel(r"$u_{}(t, x_0)$".format('{' + str(dimension) + '}'))
+                ax.set_xlabel(r't')
+                ax.set_ylabel(r'$u_{}(t, x_0)$'.format('{' + str(dimension) + '}'))
                 if trajectory == 0 and dimension == 0:
                     handles, labels = ax.get_legend_handles_labels()
                     by_label = dict(zip(labels, handles))
                     ax.legend(by_label.values(), by_label.keys())
         print()
         # Add description for which dimension and trajectory we are on
-        cols = ["State dimension {}".format(col) for col in range(self.state_dim)] + ["Control dimension {}".format(col)
+        cols = ['State dimension {}'.format(col) for col in range(self.state_dim)] + ['Control dimension {}'.format(col)
                                                                                       for col in range(self.state_dim)]
-        rows = ["Trajectory {}".format(row) for row in range(num_traj)]
+        rows = ['Trajectory {}'.format(row) for row in range(num_traj)]
         pad = 5
         if self.state_dim + self.action_dim >= 2:
             for ax, col in zip(ax_trajectory_optimization[0], cols):
-                ax.annotate(col, xy=(0.5, 1), xytext=(0, pad), xycoords="axes fraction", textcoords="offset points",
-                            size="large", ha="center", va="baseline", )
+                ax.annotate(col, xy=(0.5, 1), xytext=(0, pad), xycoords='axes fraction', textcoords='offset points',
+                            size='large', ha='center', va='baseline', )
         if num_traj >= 2:
             for ax, row in zip(ax_trajectory_optimization[:, 0], rows):
                 ax.annotate(row, xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - pad, 0), xycoords=ax.yaxis.label,
-                            textcoords="offset points", size="large", ha="right", va="center", )
+                            textcoords='offset points', size='large', ha='right', va='center', )
         return figure_control_learinng
 
     def plot(self, data: PlotData):
@@ -146,13 +146,13 @@ class Plotter:
                                              plot_values_upper=cur_plot_values_upper,
                                              q=q, statistics_type=statistics_type, observation_times=obs_times,
                                              observations=obs, prediction_states=pred)
-                ax.set_xlabel(r"t")
-                ax.set_ylabel(r"$x_{}(t)$".format(
-                    '{' + str(dimension) + '}') if space == Space.STATE else r"$\dot x_{}(t)$".format(
+                ax.set_xlabel(r't')
+                ax.set_ylabel(r'$x_{}(t)$'.format(
+                    '{' + str(dimension) + '}') if space == Space.STATE else r'$\dot x_{}(t)$'.format(
                     '{' + str(dimension) + '}'))
-                ax.plot(gt_times[trajectory], gt_values[trajectory][:, dimension], label=r"True $x_{}$".format(
-                    '{' + str(dimension) + '}') if space == Space.STATE else r"True $\dot x_{}$".format(
-                    '{' + str(dimension) + '}'), color="black", )
+                ax.plot(gt_times[trajectory], gt_values[trajectory][:, dimension], label=r'True $x_{}$'.format(
+                    '{' + str(dimension) + '}') if space == Space.STATE else r'True $\dot x_{}$'.format(
+                    '{' + str(dimension) + '}'), color='black', )
                 if trajectory == 0 and dimension == 0:
                     handles, labels = ax.get_legend_handles_labels()
                     by_label = dict(zip(labels, handles))
@@ -170,25 +170,25 @@ class Plotter:
                                                  observations=None, prediction_states=None,
                                                  actual_actions=actual_actions[trajectory][:, dimension],
                                                  predicted_actions=pred_actions)
-                    ax.set_xlabel(r"t")
-                    ax.set_ylabel(r"$u_{}(t)$".format('{' + str(dimension) + '}'))
+                    ax.set_xlabel(r't')
+                    ax.set_ylabel(r'$u_{}(t)$'.format('{' + str(dimension) + '}'))
                     if trajectory == 0 and dimension == 0:
                         handles, labels = ax.get_legend_handles_labels()
                         by_label = dict(zip(labels, handles))
                         ax.legend(by_label.values(), by_label.keys())
         # Add description for which dimension and trajectory we are on
-        cols = ["State dimension {}".format(col) for col in range(self.state_dim)] + ["Control dimension {}".format(col)
+        cols = ['State dimension {}'.format(col) for col in range(self.state_dim)] + ['Control dimension {}'.format(col)
                                                                                       for col in range(self.state_dim)]
-        rows = ["Trajectory {}".format(row) for row in range(num_trajectories)]
+        rows = ['Trajectory {}'.format(row) for row in range(num_trajectories)]
         pad = 5
         if self.state_dim >= 2 or (actual_actions is not None and (self.state_dim + self.action_dim >= 2)):
             for ax, col in zip(axs[0], cols):
-                ax.annotate(col, xy=(0.5, 1), xytext=(0, pad), xycoords="axes fraction", textcoords="offset points",
-                            size="large", ha="center", va="baseline", )
+                ax.annotate(col, xy=(0.5, 1), xytext=(0, pad), xycoords='axes fraction', textcoords='offset points',
+                            size='large', ha='center', va='baseline', )
         if num_trajectories >= 2:
             for ax, row in zip(axs[:, 0], rows):
                 ax.annotate(row, xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - pad, 0), xycoords=ax.yaxis.label,
-                            textcoords="offset points", size="large", ha="right", va="center", )
+                            textcoords='offset points', size='large', ha='right', va='center', )
 
     @staticmethod
     def _add_prediction_on_plot(ax, plot_times: jax.Array, plot_values: jax.Array | None,
@@ -201,17 +201,17 @@ class Plotter:
         if predicted_actions is not None:
             ax.plot(plot_times, predicted_actions, color='green', label='Predicted control')
         if observation_times is not None:
-            ax.plot(observation_times, observations, "r.", markersize=10, label="Observations")
+            ax.plot(observation_times, observations, 'r.', markersize=10, label='Observations')
         if prediction_states is not None:
             ax.plot(plot_times, prediction_states, color='green', label='Hallucination')
         label = ''
         if statistics_type == Statistics.MEDIAN:
-            label = "Between {:.2f} and {:.2f} quantile".format(1 - q, q)
+            label = 'Between {:.2f} and {:.2f} quantile'.format(1 - q, q)
         elif statistics_type == Statistics.MEAN:
-            label = "{}% confidence interval".format(q)
+            label = '{}% confidence interval'.format(q)
         if plot_values is not None:
-            ax.plot(plot_times, plot_values, "b-", label="Prediction")
-            ax.fill_between(plot_times.reshape(-1), plot_values_lower, plot_values_upper, alpha=0.5, fc="b", ec="None",
+            ax.plot(plot_times, plot_values, 'b-', label='Prediction')
+            ax.fill_between(plot_times.reshape(-1), plot_values_lower, plot_values_upper, alpha=0.5, fc='b', ec='None',
                             label=label)
 
     def plot_measurement_selection(self, measurement_selection: MeasurementSelection):
@@ -229,23 +229,23 @@ class Plotter:
                 cur_measurement_selection = jtu.tree_map(lambda x: x[trajectory, hallucination], measurement_selection)
                 self._add_measurement_selection_on_plot(ax, cur_measurement_selection)
                 ax.set_xlabel(r't')
-                ax.set_ylabel("Uncertainty in variance")
+                ax.set_ylabel('Uncertainty in variance')
                 if trajectory == 0 and hallucination == 0:
                     handles, labels = ax.get_legend_handles_labels()
                     by_label = dict(zip(labels, handles))
                     ax.legend(by_label.values(), by_label.keys())
         # Add description for which dimension and trajectory we are on
-        cols = ["Hallucination {}".format(col) for col in range(num_hallucinations)]
-        rows = ["Trajectory {}".format(row) for row in range(num_traj)]
+        cols = ['Hallucination {}'.format(col) for col in range(num_hallucinations)]
+        rows = ['Trajectory {}'.format(row) for row in range(num_traj)]
         pad = 5
         if num_hallucinations >= 1:
             for ax, col in zip(axs[0], cols):
-                ax.annotate(col, xy=(0.5, 1), xytext=(0, pad), xycoords="axes fraction", textcoords="offset points",
-                            size="large", ha="center", va="baseline", )
+                ax.annotate(col, xy=(0.5, 1), xytext=(0, pad), xycoords='axes fraction', textcoords='offset points',
+                            size='large', ha='center', va='baseline', )
         if num_traj >= 2:
             for ax, row in zip(axs[:, 0], rows):
                 ax.annotate(row, xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - pad, 0), xycoords=ax.yaxis.label,
-                            textcoords="offset points", size="large", ha="right", va="center", )
+                            textcoords='offset points', size='large', ha='right', va='center', )
         ############################################################################
         ############################################################################
         ############################################################################
@@ -259,23 +259,23 @@ class Plotter:
                 cur_measurement_selection = jtu.tree_map(lambda x: x[trajectory, hallucination], measurement_selection)
                 self._add_measurement_selection_on_plot_space(ax, cur_measurement_selection)
                 ax.set_xlabel(r'$\Delta(x, u)$')
-                ax.set_ylabel("Uncertainty in variance")
+                ax.set_ylabel('Uncertainty in variance')
                 if trajectory == 0 and hallucination == 0:
                     handles, labels = ax.get_legend_handles_labels()
                     by_label = dict(zip(labels, handles))
                     ax.legend(by_label.values(), by_label.keys())
         # Add description for which dimension and trajectory we are on
-        cols = ["Hallucination {}".format(col) for col in range(num_hallucinations)]
-        rows = ["Trajectory {}".format(row) for row in range(num_traj)]
+        cols = ['Hallucination {}'.format(col) for col in range(num_hallucinations)]
+        rows = ['Trajectory {}'.format(row) for row in range(num_traj)]
         pad = 5
         if num_hallucinations >= 1:
             for ax, col in zip(axs[0], cols):
-                ax.annotate(col, xy=(0.5, 1), xytext=(0, pad), xycoords="axes fraction", textcoords="offset points",
-                            size="large", ha="center", va="baseline", )
+                ax.annotate(col, xy=(0.5, 1), xytext=(0, pad), xycoords='axes fraction', textcoords='offset points',
+                            size='large', ha='center', va='baseline', )
         if num_traj >= 2:
             for ax, row in zip(axs[:, 0], rows):
                 ax.annotate(row, xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - pad, 0), xycoords=ax.yaxis.label,
-                            textcoords="offset points", size="large", ha="right", va="center", )
+                            textcoords='offset points', size='large', ha='right', va='center', )
         ############################################################################
         ############################################################################
         ############################################################################
@@ -297,18 +297,18 @@ class Plotter:
                         by_label = dict(zip(labels, handles))
                         ax.legend(by_label.values(), by_label.keys())
                 # Add description for which dimension and trajectory we are on
-            cols = ["Hallucination {}".format(col) for col in range(num_hallucinations)]
-            rows = ["Trajectory {}".format(row) for row in range(num_traj)]
+            cols = ['Hallucination {}'.format(col) for col in range(num_hallucinations)]
+            rows = ['Trajectory {}'.format(row) for row in range(num_traj)]
             pad = 5
             if num_hallucinations >= 1:
                 for ax, col in zip(axs[0], cols):
-                    ax.annotate(col, xy=(0.5, 1), xytext=(0, pad), xycoords="axes fraction",
-                                textcoords="offset points",
-                                size="large", ha="center", va="baseline", )
+                    ax.annotate(col, xy=(0.5, 1), xytext=(0, pad), xycoords='axes fraction',
+                                textcoords='offset points',
+                                size='large', ha='center', va='baseline', )
             if num_traj >= 2:
                 for ax, row in zip(axs[:, 0], rows):
                     ax.annotate(row, xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - pad, 0), xycoords=ax.yaxis.label,
-                                textcoords="offset points", size="large", ha="right", va="center", )
+                                textcoords='offset points', size='large', ha='right', va='center', )
             return fig, fig_space, fig_phase
         else:
             return fig, fig_space, None
@@ -418,7 +418,7 @@ def colorline(x, y, z=None, cmap='autumn', linewidth=2, alpha=1.0):
 
     # Special case if a single number:
     # to check for numerical input -- this is a hack
-    if not hasattr(z, "__iter__"):
+    if not hasattr(z, '__iter__'):
         z = np.array([z])
 
     z = np.asarray(z)

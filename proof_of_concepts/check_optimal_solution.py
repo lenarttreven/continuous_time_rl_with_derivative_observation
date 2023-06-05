@@ -39,9 +39,9 @@ def plot_optimal_trajectory(sim: SimulatorDynamics, sim_cc: SimulatorCostsAndCon
     start_time = time.time()
     out = optimizer.solve(None, None, initial_state, initial_actions, ilqr_params)
     print('Cost: ', out[2])
-    print("Time taken: ", time.time() - start_time)
-    plt.plot(ts, out.xs, label="xs")
-    plt.plot(ts, jnp.concatenate([out.us, out.us[-1].reshape(1, -1)]), label="us")
+    print('Time taken: ', time.time() - start_time)
+    plt.plot(ts, out.xs, label='xs')
+    plt.plot(ts, jnp.concatenate([out.us, out.us[-1].reshape(1, -1)]), label='us')
     plt.title(title)
     plt.legend()
     plt.show()
@@ -102,7 +102,7 @@ def acrobot_oc():
 if __name__ == '__main__':
     from jax.config import config
 
-    config.update("jax_enable_x64", True)
+    config.update('jax_enable_x64', True)
 
     # cartpole_oc()
     # mountain_car_oc()

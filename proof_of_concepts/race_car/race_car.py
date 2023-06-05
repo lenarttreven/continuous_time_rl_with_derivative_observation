@@ -54,15 +54,15 @@ def run_race_car():
     plt.legend()
     plt.show()
 
-    print("Final cost: ", out.obj)
-    print("Last state", out.xs[-1])
-    print("Last action", out.us[-1])
-    print("Distance to target at the end: ", jnp.linalg.norm(out.xs[-1] - costs.state_target))
+    print('Final cost: ', out.obj)
+    print('Last state', out.xs[-1])
+    print('Last action', out.us[-1])
+    print('Distance to target at the end: ', jnp.linalg.norm(out.xs[-1] - costs.state_target))
     return out
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     from jax.config import config
 
-    config.update("jax_enable_x64", True)
+    config.update('jax_enable_x64', True)
     out = run_race_car()

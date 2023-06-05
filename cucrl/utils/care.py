@@ -99,9 +99,9 @@ def sda_care(a: jnp.ndarray, b: jnp.ndarray, c: jnp.ndarray, g_c: float):
 if __name__ == '__main__':
     from jax.config import config
 
-    config.update("jax_enable_x64", True)
-    config.update("jax_debug_infs", True)
-    config.update("jax_debug_nans", True)
+    config.update('jax_enable_x64', True)
+    config.update('jax_debug_infs', True)
+    config.update('jax_debug_nans', True)
     np.set_printoptions(precision=2, suppress=True)
 
     dim_x = 4

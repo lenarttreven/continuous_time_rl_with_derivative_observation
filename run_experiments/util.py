@@ -101,13 +101,13 @@ def generate_base_command(module, flags: Optional[Dict[str, Any]] = None, unbuff
     else:
         base_cmd = interpreter_script + ' ' + base_exp_script
     if flags is not None:
-        assert isinstance(flags, dict), "Flags must be provided as dict"
+        assert isinstance(flags, dict), 'Flags must be provided as dict'
         for flag, setting in flags.items():
             if type(setting) == bool or type(setting) == np.bool_:
                 if setting:
-                    base_cmd += f" --{flag}"
+                    base_cmd += f' --{flag}'
             else:
-                base_cmd += f" --{flag}={setting}"
+                base_cmd += f' --{flag}={setting}'
     return base_cmd
 
 
@@ -130,7 +130,7 @@ def generate_run_commands(command_list: List[str], num_cpus: int = 1, num_gpus: 
             cluster_cmds.append(sbatch_cmd + f'--wrap="{python_cmd}"')
 
         if promt:
-            answer = input(f"About to submit {len(cluster_cmds)} compute jobs to the cluster. Proceed? [yes/no]")
+            answer = input(f'About to submit {len(cluster_cmds)} compute jobs to the cluster. Proceed? [yes/no]')
         else:
             answer = 'yes'
         if answer == 'yes':
@@ -142,7 +142,7 @@ def generate_run_commands(command_list: List[str], num_cpus: int = 1, num_gpus: 
 
     elif mode == 'local':
         if promt:
-            answer = input(f"About to run {len(command_list)} jobs in a loop. Proceed? [yes/no]")
+            answer = input(f'About to run {len(command_list)} jobs in a loop. Proceed? [yes/no]')
         else:
             answer = 'yes'
 
@@ -156,7 +156,7 @@ def generate_run_commands(command_list: List[str], num_cpus: int = 1, num_gpus: 
     elif mode == 'local_async':
         if promt:
             answer = input(
-                f"About to launch {len(command_list)} commands in {num_cpus} local processes. Proceed? [yes/no]")
+                f'About to launch {len(command_list)} commands in {num_cpus} local processes. Proceed? [yes/no]')
         else:
             answer = 'yes'
 

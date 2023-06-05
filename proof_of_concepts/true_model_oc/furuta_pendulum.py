@@ -6,7 +6,7 @@ from cucrl.optimal_cost.optimal_cost_ilqr import OptimalCost
 from cucrl.simulator.simulator_costs import FurutaPendulum as FurutaPendulumCosts
 from cucrl.simulator.simulator_dynamics import FurutaPendulum
 
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 
 
 def run_furuta_pendulum():

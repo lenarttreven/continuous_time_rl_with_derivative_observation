@@ -21,7 +21,7 @@ from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, B
 from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, BetaType
 from cucrl.utils.representatives import TimeHorizonType, BatchStrategy, MinimizationMethod
 
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 
 
 def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: BatchStrategy, project_name: str):
@@ -177,7 +177,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
 def main(args):
     t_start = time.time()
     experiment(args.data_seed, BatchStrategy[args.measurement_selection_strategy], args.project_name)
-    print("Total time taken: ", time.time() - t_start, " seconds")
+    print('Total time taken: ', time.time() - t_start, ' seconds')
 
 
 if __name__ == '__main__':

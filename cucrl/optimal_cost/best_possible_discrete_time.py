@@ -153,11 +153,11 @@ class BestPossibleDiscreteAlgorithm:
         return _running_cost + _terminal_cost
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     from jax.config import config
     import matplotlib.pyplot as plt
 
-    config.update("jax_enable_x64", True)
+    config.update('jax_enable_x64', True)
 
     # # Pendulum
     # state_scaling = jnp.diag(jnp.array([1.0, 2.0]))
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     simulator_costs = QuadrotorEulerCost(state_scaling=state_scaling)
     best_possible_algorithm = BestPossibleDiscreteAlgorithm(simulator_dynamics, simulator_costs, time_horizon=(0, 15),
                                                             num_nodes=20)
-    print("Best discrete cost: ",
+    print('Best discrete cost: ',
           best_possible_algorithm.get_optimal_cost(jnp.array([1.0, 1.0, 1.0,
                                                               0., 0., 0.,
                                                               0.0, 0.0, 0.0,

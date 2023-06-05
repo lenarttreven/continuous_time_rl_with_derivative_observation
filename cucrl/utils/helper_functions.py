@@ -392,6 +392,6 @@ def norm_difference(z: jax.Array):
     return jnp.cumsum(differences_with_0)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     a = random.normal(key=random.PRNGKey(0), shape=(10, 3))
     print(norm_difference(a))

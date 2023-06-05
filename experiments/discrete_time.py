@@ -11,7 +11,7 @@ from trajax.optimizers import ILQRHyperparams, ILQR
 from cucrl.simulator.simulator_costs import Pendulum as PendulumCost
 from cucrl.simulator.simulator_dynamics import Pendulum
 from jax.config import config
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 
 simulator = Pendulum()
 simulator_cost = PendulumCost()
@@ -73,7 +73,7 @@ cost_params = dynamics_params
 start_time = time.time()
 out = ilqr.solve(dynamics_params, cost_params, initial_state, initial_actions, ilqr_params)
 print('Cost: ', out[2])
-print("Time taken: ", time.time() - start_time)
+print('Time taken: ', time.time() - start_time)
 
 
 # Evaluation:
@@ -129,7 +129,7 @@ def cost_fn_eval(xs, us):
 
 
 true_cost = cost_fn_eval(xs_all, us_all)
-print("True cost: ", true_cost)
+print('True cost: ', true_cost)
 print(us_all.shape, xs_all.shape,)
 
 # ts_eval = jnp.linspace(0, T, num_low_steps * num_action_points + 1)

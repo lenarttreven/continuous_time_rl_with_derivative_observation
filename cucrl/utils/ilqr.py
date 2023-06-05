@@ -227,11 +227,11 @@ def iterative_linear_quadratic_regulator(dynamics, total_cost, x0, u_guess, maxi
         (0, xs_iterates, us_iterates, j_curr, jnp.inf, value_functions_iterates))
 
     return {
-        "optimal_trajectory": (xs_iterates[i], us_iterates[i]),
-        "optimal_cost": j_curr,
-        "num_iterations": i,
-        "trajectory_iterates": (xs_iterates, us_iterates),
-        "value_functions_iterates": value_functions_iterates
+        'optimal_trajectory': (xs_iterates[i], us_iterates[i]),
+        'optimal_cost': j_curr,
+        'num_iterations': i,
+        'trajectory_iterates': (xs_iterates, us_iterates),
+        'value_functions_iterates': value_functions_iterates
     }
 
 
@@ -285,7 +285,7 @@ class ILOR:
 if __name__ == '__main__':
     from jax.config import config
 
-    config.update("jax_enable_x64", True)
+    config.update('jax_enable_x64', True)
     system = Pendulum()
     system_cost = PendulumCost()
 
@@ -353,7 +353,7 @@ if __name__ == '__main__':
         u_guess,
     )
     print(time.time() - start_time)
-    i = solution["num_iterations"]
+    i = solution['num_iterations']
 
     xs, us = solution['optimal_trajectory']
     ts = jnp.linspace(0, T, N + 1)

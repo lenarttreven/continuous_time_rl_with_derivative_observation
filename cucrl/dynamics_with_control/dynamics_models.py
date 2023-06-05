@@ -68,7 +68,7 @@ def get_dynamics(dynamics_model: Dynamics, state_dim: int, action_dim: int, norm
                            bandwidth_svgd=dynamics_config.bandwidth_svgd,
                            measurement_collection_config=measurement_collection_config)
     else:
-        raise NotImplementedError("Chosen dynamics model has not been implemented yet.")
+        raise NotImplementedError('Chosen dynamics model has not been implemented yet.')
 
 
 class AbstractDynamics(ABC):
@@ -242,8 +242,8 @@ class GPDynamics(AbstractDynamics):
 
     def kernel(self, x, y, params):
         assert x.ndim == y.ndim == 1
-        assert params["lengthscale"].shape == x.shape
-        return jnp.exp(- jnp.sum((x - y) ** 2 / make_positive(params["lengthscale"]) ** 2))
+        assert params['lengthscale'].shape == x.shape
+        return jnp.exp(- jnp.sum((x - y) ** 2 / make_positive(params['lengthscale']) ** 2))
 
     def mean_and_std_eval_one(self, dynamics_model: DynamicsModel, x, u):
         assert x.ndim == u.ndim == 1
@@ -317,7 +317,7 @@ class GPDynamics(AbstractDynamics):
         # Inout dimension is state_dim + action_dim, we have one lengthscale for each dimension
         # Ouput dimension is state_dim, because we have one GP per state dimension
         # So we have lengthscales for each state dimension
-        parameters["lengthscale"] = random.normal(key=key, shape=(self.x_dim, cat_input.size))
+        parameters['lengthscale'] = random.normal(key=key, shape=(self.x_dim, cat_input.size))
         return parameters, dict()
 
     def mean_eval_one(self, dynamics_model: DynamicsModel, x: jax.Array, u: jax.Array) -> jax.Array:
@@ -1108,7 +1108,7 @@ class fSVGDDynamicsLV(AbstractfSVGDDynamics):
 if __name__ == '__main__':
     from jax.config import config
 
-    config.update("jax_enable_x64", True)
+    config.update('jax_enable_x64', True)
 
     state_dim = 2
     control_dim = 1

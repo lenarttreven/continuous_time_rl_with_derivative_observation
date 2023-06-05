@@ -75,7 +75,7 @@ start_time = time.time()
 
 model_params, model_stats = model.fit_model(dataset=train_data, num_epochs=1000, data_stats=data_stats,
                                             data_std=data_std, batch_size=64)
-print(f"Training time: {time.time() - start_time:.2f} seconds")
+print(f'Training time: {time.time() - start_time:.2f} seconds')
 
 
 def dynamics_fn(x, u, t):
@@ -100,15 +100,15 @@ ts = jnp.arange(0, T, dt)
 start_time = time.time()
 out = ilqr(cost_fn, dynamics, initial_state, initial_actions)
 print('Cost: ', out[2])
-print("Time taken: ", time.time() - start_time)
+print('Time taken: ', time.time() - start_time)
 
 start_time = time.time()
 out = ilqr(cost_fn, dynamics, initial_state, initial_actions)
 print('Cost: ', out[2])
-print("Time taken: ", time.time() - start_time)
+print('Time taken: ', time.time() - start_time)
 
-plt.plot(ts, out[0][:-1, :], label="xs")
-plt.title("iLQR warmup")
-plt.plot(ts, out[1], label="us")
+plt.plot(ts, out[0][:-1, :], label='xs')
+plt.title('iLQR warmup')
+plt.plot(ts, out[1], label='us')
 plt.legend()
 plt.show()

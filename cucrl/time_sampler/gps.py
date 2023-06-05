@@ -5,7 +5,7 @@ from jax import vmap, random
 from jax.config import config
 from jax.scipy.linalg import cho_factor, cho_solve
 
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 
 
 # Need to vectorize this to be able to handle multiple outputs (it can take several inputs already)

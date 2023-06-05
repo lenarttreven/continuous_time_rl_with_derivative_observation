@@ -26,7 +26,7 @@ state_dim = 2
 SUBSTRACTION = 20.1
 
 q = 0.2
-data = pd.read_csv("pendulum_small_input_control.csv")
+data = pd.read_csv('pendulum_small_input_control.csv')
 groups = data['group'].unique()
 
 
@@ -69,7 +69,7 @@ def colorline(x, y, z=None, cmap='autumn', linewidth=2, alpha=1.0):
 
     # Special case if a single number:
     # to check for numerical input -- this is a hack
-    if not hasattr(z, "__iter__"):
+    if not hasattr(z, '__iter__'):
         z = np.array([z])
 
     z = np.asarray(z)
@@ -176,25 +176,25 @@ def add_measurement_selection_on_plot(ax, measurement_selection: MeasurementSele
 def add_first_plot(ax):
     for group in groups:
         group_data = data[data['group'] == group]
-        groupped_data = group_data.groupby(['episode'])[["Cost/True trajectory 0"]]
+        groupped_data = group_data.groupby(['episode'])[['Cost/True trajectory 0']]
         costs_means = groupped_data.median().values.reshape(-1) - SUBSTRACTION
         costs_lower_quantile = groupped_data.quantile(q).values.reshape(-1, ) - SUBSTRACTION
         costs_upper_quantile = groupped_data.quantile(1 - q).values.reshape(-1, ) - SUBSTRACTION
-        ax.plot(np.arange(len(costs_means)), costs_means, label=group.split(".", 1)[1].replace("_GREEDY", ""))
+        ax.plot(np.arange(len(costs_means)), costs_means, label=group.split('.', 1)[1].replace('_GREEDY', ''))
         ax.fill_between(np.arange(len(costs_means)), costs_lower_quantile, costs_upper_quantile, alpha=0.3)
 
-    ax.axhline(20.16 - SUBSTRACTION, xmin=0, xmax=20, color="black", linestyle="--", label='Best continuous',
+    ax.axhline(20.16 - SUBSTRACTION, xmin=0, xmax=20, color='black', linestyle='--', label='Best continuous',
                linewidth=4)
-    ax.axhline(20.593 - SUBSTRACTION, xmin=0, xmax=20, color="black", linestyle='dotted', label='Best discrete',
+    ax.axhline(20.593 - SUBSTRACTION, xmin=0, xmax=20, color='black', linestyle='dotted', label='Best discrete',
                linewidth=4)
-    ax.set_ylabel("Cost", fontsize=YLABLE_FONTIZE)
-    ax.set_xlabel("Episode", fontsize=XLABLE_FONTIZE)
+    ax.set_ylabel('Cost', fontsize=YLABLE_FONTIZE)
+    ax.set_xlabel('Episode', fontsize=XLABLE_FONTIZE)
 
     ax.tick_params(axis='x', labelsize=XTICKS_FONTIZE)
     ax.tick_params(axis='y', labelsize=YTICKS_FONTIZE)
 
     ax.set_xlim(3)
-    ax.set_yscale("log")
+    ax.set_yscale('log')
     ax.legend(fontsize=LEGEND_FONTIZE)
 
 

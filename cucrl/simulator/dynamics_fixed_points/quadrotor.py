@@ -5,9 +5,9 @@ from jax.config import config
 
 from cucrl.simulator.simulator_dynamics import QuadrotorEuler
 
-config.update("jax_enable_x64", True)
-config.update("jax_debug_infs", True)
-config.update("jax_debug_nans", True)
+config.update('jax_enable_x64', True)
+config.update('jax_debug_infs', True)
+config.update('jax_debug_nans', True)
 
 state_scaling = jnp.diag(jnp.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], dtype=jnp.float64))
 control_scaling = jnp.diag(jnp.array([1, 1e2, 1e2, 1e2], dtype=jnp.float64))

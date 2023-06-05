@@ -18,7 +18,7 @@ from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, B
 from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, BetaType
 from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -130,17 +130,17 @@ if __name__ == '__main__':
     if track_wandb:
         home_folder = os.getcwd()
         home_folder = '/'.join(home_folder.split('/')[:4])
-        group_name = "Testing"
+        group_name = 'Testing'
         if home_folder == '/cluster/home/trevenl':
             wandb.init(
                 dir='/cluster/scratch/trevenl',
-                project="Quadrotor2d",
+                project='Quadrotor2d',
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )
         else:
             wandb.init(
-                project="Quadrotor2d",
+                project='Quadrotor2d',
                 group=group_name,
                 config=namedtuple_to_dict(run_config),
             )

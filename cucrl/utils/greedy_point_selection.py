@@ -208,7 +208,7 @@ def onedim_fun_example_dist():
     axs[0, 0].scatter(x[best_indices], jnp.zeros_like(x[best_indices]), color='red', marker='x')
     test = '2'
     axs[0, 0].plot(x, jnp.zeros_like(x), color='blue', alpha=0.3,
-                   label=r'$\sum_{}^{} \sigma_i^2(x(t))$'.format("i=0", 2))
+                   label=r'$\sum_{}^{} \sigma_i^2(x(t))$'.format('i=0', 2))
     plt.legend()
     plt.show()
 
@@ -249,7 +249,7 @@ def onedim_fun_example():
 
     best_indices = out[0]
 
-    print("Max determinant: ", jnp.linalg.slogdet(K[np.ix_(best_indices, best_indices)])[1])
+    print('Max determinant: ', jnp.linalg.slogdet(K[np.ix_(best_indices, best_indices)])[1])
 
     initial_variances = vmap(posterior_kernel, in_axes=(0, 0))(x.reshape(-1, 1), x.reshape(-1, 1))
 
@@ -260,7 +260,7 @@ def onedim_fun_example():
     axs[0, 0].scatter(x[best_indices], jnp.zeros_like(x[best_indices]), color='red', marker='x')
     test = '2'
     axs[0, 0].plot(x, jnp.zeros_like(x), color='blue', alpha=0.3,
-                   label=r'$\sum_{}^{} \sigma_i^2(x(t))$'.format("i=0", 2))
+                   label=r'$\sum_{}^{} \sigma_i^2(x(t))$'.format('i=0', 2))
     plt.legend()
     plt.show()
 
@@ -289,7 +289,7 @@ def onedim_example():
 
     best_indices = out[0]
 
-    print("Max determinant: ", jnp.linalg.slogdet(K[jnp.ix_(best_indices, best_indices)])[1])
+    print('Max determinant: ', jnp.linalg.slogdet(K[jnp.ix_(best_indices, best_indices)])[1])
 
     plt.scatter(x, jnp.zeros_like(x), color='blue')
     plt.scatter(x[best_indices], jnp.zeros_like(x[best_indices]), color='red')
@@ -325,14 +325,14 @@ def multidim_example():
     def compute_one_det(K_one, indices):
         return jnp.linalg.slogdet(K_one[jnp.ix_(indices, indices)])[1]
 
-    print("Max determinant: ", jnp.sum(vmap(compute_one_det, in_axes=(0, None))(K, best_indices)))
+    print('Max determinant: ', jnp.sum(vmap(compute_one_det, in_axes=(0, None))(K, best_indices)))
 
     plt.scatter(x, jnp.zeros_like(x), color='blue')
     plt.scatter(x[best_indices], jnp.zeros_like(x[best_indices]), color='red')
     plt.show()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # onedim_example()
     # multidim_example()
     # onedim_fun_example()

@@ -79,7 +79,7 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
         chex.assert_type(t_k, int)
         # Events are also filtered to the trajectory that we are hallucinating (filtering is done with the integrator)
         # Hallucinate trajectory
-        jax.debug.print("Hallucinate other episode time step: {t}", t=t_k)
+        jax.debug.print('Hallucinate other episode time step: {t}', t=t_k)
         hallucination_steps_arr = events.collector_carry.hallucination_steps_arr
 
         new_key, subkey = random.split(events.collector_carry.key)
@@ -128,7 +128,7 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
             x_next = x + self.inner_dt * x_dot
             return x_next, x_next
 
-        jax.debug.print("Hallucinate other episode time step: {t}", t=hal_carry.t_k)
+        jax.debug.print('Hallucinate other episode time step: {t}', t=hal_carry.t_k)
 
         # Prepare times for scan
         ts_scan = self.all_ts[hal_carry.t_k] + self.ts_inner_nodes
@@ -141,7 +141,7 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
     def episode_zero_hallucination(self, x_k: chex.Array, t_k: chex.Array, events: IntegrationCarry,
                                    dynamics_model: DynamicsModel, tracking_data: TrackingData) -> HallucinationOut:
         # new_events are the same as the old ones, except for events.mpc_carry.next_update_time
-        jax.debug.print("Hallucinate episode 0 time step: {t}", t=t_k)
+        jax.debug.print('Hallucinate episode 0 time step: {t}', t=t_k)
         hallucination_steps_arr = events.collector_carry.hallucination_steps_arr
         next_measurement_time = t_k + hallucination_steps_arr.shape[0]
         new_collector_carry = CollectorCarry(hallucination_steps_arr=hallucination_steps_arr,
@@ -168,8 +168,8 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
         # return self.default_measurement_selection(), events
         # We can hallucinate on the mean dynamics, the optimistic dynamics with epsilon, dynamics with particle or
         # with Gaussian Process, we implement it here for the mean dynamics first, we return the next time for sampling
-        jax.debug.print("Hallucinate time step: {t}", t=t_k)
-        jax.debug.print("Episode for hallucination: {episode}", episode=dynamics_model.episode)
+        jax.debug.print('Hallucinate time step: {t}', t=t_k)
+        jax.debug.print('Episode for hallucination: {episode}', episode=dynamics_model.episode)
         return cond(dynamics_model.episode == 0, self.episode_zero_hallucination, self.other_episode_hallucination, x_k,
                     t_k, events, dynamics_model, tracking_data)
 

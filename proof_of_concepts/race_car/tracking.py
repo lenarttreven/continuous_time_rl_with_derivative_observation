@@ -62,6 +62,6 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
 
-    print("Final cost: ", out.obj)
-    print("Last state", out.xs[-1])
-    print("Last action", out.us[-1])
+    print('Final cost: ', out.obj)
+    print('Last state', out.xs[-1])
+    print('Last action', out.us[-1])

@@ -2,10 +2,10 @@ import pendulum_exp
 from cucrl.utils.representatives import BatchStrategy, ExplorationStrategy
 from run_experiments.util import generate_base_command, generate_run_commands
 
-PROJECT_NAME = "Ablation_study_pendulum_very_small_input_control"
+PROJECT_NAME = 'Ablation_study_pendulum_very_small_input_control'
 
 applicable_configs = {
-    "ExplorationStrategy": [ExplorationStrategy.OPTIMISTIC_ETA_TIME, ExplorationStrategy.MEAN],
+    'ExplorationStrategy': [ExplorationStrategy.OPTIMISTIC_ETA_TIME, ExplorationStrategy.MEAN],
     'MSS': [BatchStrategy.MAX_KERNEL_DISTANCE_GREEDY, BatchStrategy.MAX_DETERMINANT_GREEDY, BatchStrategy.EQUIDISTANT],
     'data_seed': [i for i in range(10)],
 }

@@ -10,7 +10,7 @@ def get_dataset(run_name):
     for run in runs:
         frames = []
         for key in keys:
-            frames.append(run.history(keys=[key], x_axis="episode"))
+            frames.append(run.history(keys=[key], x_axis='episode'))
         frames = [df.set_index('episode') for df in frames]
         frames = pd.concat(frames, axis=0)
         frames['group'] = run.group
@@ -20,5 +20,5 @@ def get_dataset(run_name):
     return dataset
 
 
-out = get_dataset("trevenl/Pendulum_small_input_control")
-out.to_csv("pendulum_small_input_control.csv")
+out = get_dataset('trevenl/Pendulum_small_input_control')
+out.to_csv('pendulum_small_input_control.csv')
