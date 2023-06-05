@@ -186,7 +186,7 @@ class NumpyArrayEncoder(json.JSONEncoder):
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         else:
-            return super(NumpyArrayEncoder, self).default(obj)
+            return super().default(obj)
 
 
 def hash_dict(d):
@@ -229,7 +229,7 @@ def collect_exp_results(exp_name: str, dir_tree_depth: int = 3, verbose: bool = 
 
         if os.path.isfile(results_file):
             try:
-                with open(results_file, 'r') as f:
+                with open(results_file) as f:
                     exp_dict = json.load(f)
                 if isinstance(exp_dict, dict):
                     exp_dicts.append({**exp_dict['evals'], **exp_dict['params']})

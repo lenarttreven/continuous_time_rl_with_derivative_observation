@@ -677,7 +677,7 @@ class AbstractfSVGDDynamics(AbstractDynamics):
 
 class fSVGDAffineDynamics(AbstractDynamics):
     """
-    We reprensent dynamics as \dot x = \a(x) + b(x)u
+    We reprensent dynamics as \\dot x = \a(x) + b(x)u
     """
 
     def __init__(self, x_dim, u_dim, normalizer, features: Sequence[int], angle_layer: AngleLayerDynamics,

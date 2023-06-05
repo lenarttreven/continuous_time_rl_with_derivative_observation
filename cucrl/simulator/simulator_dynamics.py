@@ -155,7 +155,7 @@ class LotkaVolterra(SimulatorDynamics):
 class CartPole(SimulatorDynamics):
     """
     Dynamics of CartPole
-    x represents: (\theta, \dot{\theta}, x, \dot{x})
+    x represents: (\theta, \\dot{\theta}, x, \\dot{x})
     """
 
     def __init__(self, system_params=jnp.array([0.5, 1.0, 0.5]), g=0.2, time_scaling=None, state_scaling=None,
@@ -188,7 +188,7 @@ class CartPole(SimulatorDynamics):
 class VanDerPolOscilator(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None,
                  control_scaling=None):
-        super(VanDerPolOscilator, self).__init__(state_dim=2, control_dim=1, system_params=None,
+        super().__init__(state_dim=2, control_dim=1, system_params=None,
                                                  time_scaling=time_scaling,
                                                  state_scaling=state_scaling, control_scaling=control_scaling)
 
@@ -201,7 +201,7 @@ class VanDerPolOscilator(SimulatorDynamics):
 class Glucose(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None,
                  control_scaling=None):
-        super(Glucose, self).__init__(state_dim=2, control_dim=1, system_params=None,
+        super().__init__(state_dim=2, control_dim=1, system_params=None,
                                       time_scaling=time_scaling, state_scaling=state_scaling,
                                       control_scaling=control_scaling)
 
@@ -681,7 +681,7 @@ class RaceCar(SimulatorDynamics):
 
     def __init__(self, time_scaling=None, state_scaling=None, params: CarParams = CarParams(),
                  control_scaling=None, control_ratio: int = 10):
-        super(RaceCar, self).__init__(state_dim=6, control_dim=2, system_params=None,
+        super().__init__(state_dim=6, control_dim=2, system_params=None,
                                       time_scaling=time_scaling, state_scaling=state_scaling,
                                       control_scaling=control_scaling)
         self.control_ratio = control_ratio
@@ -840,7 +840,7 @@ class RaceCar(SimulatorDynamics):
 class CancerTreatment(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None,
                  control_scaling=None):
-        super(CancerTreatment, self).__init__(state_dim=1, control_dim=1, system_params=None,
+        super().__init__(state_dim=1, control_dim=1, system_params=None,
                                               time_scaling=time_scaling, state_scaling=state_scaling,
                                               control_scaling=control_scaling)
 
@@ -861,7 +861,7 @@ class CancerTreatment(SimulatorDynamics):
 class HIVTreatment(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None,
                  control_scaling=None):
-        super(HIVTreatment, self).__init__(state_dim=3, control_dim=1, system_params=None,
+        super().__init__(state_dim=3, control_dim=1, system_params=None,
                                            time_scaling=time_scaling, state_scaling=state_scaling,
                                            control_scaling=control_scaling)
 

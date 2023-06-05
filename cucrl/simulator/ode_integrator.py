@@ -180,7 +180,7 @@ class StateDerivativePair:
 
 class ForwardEuler(Integrator):
     def __init__(self, interactor, simulator_config: SimulatorConfig):
-        super(ForwardEuler, self).__init__(interactor=interactor, simulator_config=simulator_config)
+        super().__init__(interactor=interactor, simulator_config=simulator_config)
         T = simulator_config.time_horizon[1] - simulator_config.time_horizon[0]
         total_int_steps = simulator_config.num_nodes * simulator_config.num_int_step_between_nodes
         self.dt = T / total_int_steps

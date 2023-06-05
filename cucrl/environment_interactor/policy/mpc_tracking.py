@@ -25,7 +25,7 @@ class MPCTracking(Policy):
     def __init__(self, x_dim, u_dim, dynamics: AbstractDynamics, initial_conditions, normalizer,
                  angle_layer: AngleLayerDynamics, interaction_config: InteractionConfig,
                  offline_planner: AbstractOfflinePlanner, scaling: Scaling):
-        super(MPCTracking, self).__init__(x_dim, u_dim, initial_conditions, normalizer, offline_planner,
+        super().__init__(x_dim, u_dim, initial_conditions, normalizer, offline_planner,
                                           interaction_config, angle_layer, scaling)
         self.mpc_tracker = MPCTracker(x_dim=x_dim, u_dim=u_dim, scaling=scaling, dynamics=dynamics,
                                       simulator_costs=offline_planner.simulator_costs,

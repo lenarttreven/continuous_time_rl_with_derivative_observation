@@ -9,7 +9,7 @@ from jax.tree_util import register_pytree_node_class
 
 
 @register_pytree_node_class
-class InterpolatedUnivariateSpline(object):
+class InterpolatedUnivariateSpline:
     def __init__(self, x, y, k=3, endpoints='not-a-knot', coefficients=None):
         """JAX implementation of kth-order spline interpolation.
         This class aims to reproduce scipy's InterpolatedUnivariateSpline

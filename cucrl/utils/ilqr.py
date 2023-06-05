@@ -36,7 +36,7 @@ class QuadraticCost(NamedTuple):
     @classmethod
     def from_pure_quadratic(cls, c_xx, c_uu, c_ux):
         return cls(
-            jnp.zeros((c_xx.shape[:-2])),
+            jnp.zeros(c_xx.shape[:-2]),
             jnp.zeros(c_xx.shape[:-1]),
             jnp.zeros(c_uu.shape[:-1]),
             c_xx,
