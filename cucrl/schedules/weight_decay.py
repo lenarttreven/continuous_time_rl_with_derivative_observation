@@ -1,12 +1,7 @@
 from enum import Enum, auto
-from typing import Callable
 
 from jax.example_libraries.optimizers import constant, piecewise_constant
-from optax import polynomial_schedule
-
-from cucrl.schedules.betas import polynomial_decay
-
-Schedule = Callable[[int], float]
+from optax import polynomial_schedule, Schedule
 
 
 class WeightDecayType(Enum):
@@ -22,7 +17,7 @@ def get_weight_decay(wd_type: WeightDecayType, kwargs: dict) -> Schedule:
     elif wd_type == WeightDecayType.CONSTANT:
         weight_decay = constant(**kwargs)
     elif wd_type == WeightDecayType.POLYNOMIAL_DECAY:
-        weight_decay = polynomial_decay(**kwargs)
+        weight_decay = polynomial_schedule(**kwargs)
     elif wd_type == WeightDecayType.TRANSITION_BETWEEN_VALUES:
         weight_decay = transition_between_values(**kwargs)
     return weight_decay
