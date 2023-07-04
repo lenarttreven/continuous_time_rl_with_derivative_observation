@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 
+import chex
 import jax
 import jax.numpy as jnp
 from jax import random
@@ -11,13 +12,14 @@ from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanne
 from cucrl.utils.classes import IntegrationCarry, TrackingData, MPCCarry, DynamicsModel
 from cucrl.utils.classes import OfflinePlanningData
 from cucrl.utils.helper_functions import AngleLayerDynamics
+from cucrl.environment_interactor.discretization.runge_kutta import RungeKutta
 
 # PolicyOit is the output of the policy and represents: [us, t_next, events]
 PolicyOut = Tuple[jax.Array, jax.Array, IntegrationCarry]
 
 
 class Policy(ABC):
-    def __init__(self, x_dim: int, u_dim: int, initial_condition: List[jnp.ndarray], normalizer: Normalizer,
+    def __init__(self, x_dim: int, u_dim: int, initial_condition: List[chex.Array], normalizer: Normalizer,
                  offline_planner: AbstractOfflinePlanner, interaction_config: InteractionConfig,
                  angle_layer: AngleLayerDynamics, scaling: Scaling):
         self.scaling = scaling
