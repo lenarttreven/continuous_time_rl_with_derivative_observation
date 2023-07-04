@@ -8,11 +8,10 @@ import wandb
 from jax.config import config
 
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig
-from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, BetasConfig, OnlineTrackingConfig, BatchSize
+from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
-from cucrl.main.config import RunConfig, DataGenerationConfig, DynamicsConfig, InteractionConfig
+from cucrl.main.config import RunConfig, DynamicsConfig, InteractionConfig, DataGeneratorConfig
 from cucrl.main.learn_system import LearnSystem
-from cucrl.schedules.betas import BetasType
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.helper_functions import namedtuple_to_dict
 from cucrl.utils.representatives import ExplorationStrategy, DynamicsTracking, BNNTypes
@@ -47,7 +46,7 @@ def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: Ba
 
     run_config = RunConfig(
         seed=seed,
-        data_generation=DataGenerationConfig(
+        data_generation=DataGeneratorConfig(
             scaling=Scaling(state_scaling=jnp.diag(jnp.array([1.0, 2.0])),
                             control_scaling=jnp.eye(action_dim),
                             time_scaling=jnp.ones(shape=(1,))),

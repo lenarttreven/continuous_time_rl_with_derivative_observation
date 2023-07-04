@@ -3,7 +3,6 @@ from typing import NamedTuple, Dict, List, Callable, Tuple
 import jax
 from jax import random, numpy as jnp
 
-from cucrl.schedules.betas import BetasType
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.representatives import BetaType, BNNTypes, BatchStrategy
 from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, TimeHorizonType
@@ -122,10 +121,6 @@ class InteractionConfig(NamedTuple):
     system_assumptions: SystemAssumptions = SystemAssumptions()
     measurement_collector: MeasurementCollectionConfig = MeasurementCollectionConfig()
 
-
-class BetasConfig(NamedTuple):
-    type: BetasType
-    kwargs: Dict
 
 
 class OptimizerConfig(NamedTuple):

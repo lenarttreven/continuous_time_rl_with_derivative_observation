@@ -2,8 +2,7 @@ from enum import Enum, auto
 from typing import Callable
 
 from jax.example_libraries.optimizers import constant, piecewise_constant
-
-from cucrl.schedules.betas import polynomial_decay
+from optax import polynomial_schedule
 
 Schedule = Callable[[int], float]
 
@@ -20,5 +19,5 @@ def get_learning_rate(lr_type: LearningRateType, kwargs: dict) -> Schedule:
     elif lr_type == LearningRateType.CONSTANT:
         learning_rate = constant(**kwargs)
     elif lr_type == LearningRateType.POLYNOMIAL_DECAY:
-        learning_rate = polynomial_decay(**kwargs)
+        learning_rate = polynomial_schedule(**kwargs)
     return learning_rate

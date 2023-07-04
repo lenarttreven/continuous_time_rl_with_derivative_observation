@@ -43,7 +43,6 @@ if __name__ == '__main__':
     visualization = True
     numerical_correction = 0
 
-    beta = 1
     state_dim = 2
     action_dim = 1
     num_trajectories = len(initial_conditions)

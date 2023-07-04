@@ -2,8 +2,9 @@ from enum import Enum, auto
 from typing import Callable
 
 from jax.example_libraries.optimizers import constant, piecewise_constant
+from optax import polynomial_schedule
 
-from cucrl.schedules.betas import polynomial_decay, indicator
+from cucrl.schedules.betas import polynomial_decay
 
 Schedule = Callable[[int], float]
 
@@ -28,11 +29,4 @@ def get_weight_decay(wd_type: WeightDecayType, kwargs: dict) -> Schedule:
 
 
 def transition_between_values(transition_start, step_size, decay_steps, final_step_size, power=1.0) -> Schedule:
-    initial_value = constant(step_size)
-    later_value = polynomial_decay(step_size, decay_steps, final_step_size, power=power)
-
-    def schedule(i):
-        return indicator(transition_start - i) * initial_value(i) + indicator(
-            i - transition_start) * later_value(i - transition_start)
-
-    return schedule
+    return polynomial_schedule(step_size, final_step_size, power, decay_steps, transition_start)
