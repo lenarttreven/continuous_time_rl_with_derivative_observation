@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from typing import Tuple
 
 import jax
 import jax.numpy as jnp
 from jax.lax import cond
-from trajax.optimizers import ILQRHyperparams, ILQR
+from trajax.optimizers import ILQR
+from trajax.optimizers import ILQRHyperparams
 
 from cucrl.simulator.simulator_costs import Bicycle as BicycleCost
 from cucrl.simulator.simulator_costs import FurutaPendulum as FurutaPendulumCost
@@ -11,13 +14,11 @@ from cucrl.simulator.simulator_costs import MountainCar as MountainCarCost
 from cucrl.simulator.simulator_costs import Pendulum as PendulumCost
 from cucrl.simulator.simulator_costs import RaceCar as RaceCarCost
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
-from cucrl.simulator.simulator_dynamics import (
-    Pendulum,
-    Bicycle,
-    RaceCar,
-    FurutaPendulum,
-    MountainCar,
-)
+from cucrl.simulator.simulator_dynamics import Bicycle
+from cucrl.simulator.simulator_dynamics import FurutaPendulum
+from cucrl.simulator.simulator_dynamics import MountainCar
+from cucrl.simulator.simulator_dynamics import Pendulum
+from cucrl.simulator.simulator_dynamics import RaceCar
 from cucrl.simulator.simulator_dynamics import SimulatorDynamics
 
 
@@ -26,7 +27,7 @@ class OptimalCost:
         self,
         simulator_dynamics: SimulatorDynamics,
         simulator_costs: SimulatorCostsAndConstraints,
-        time_horizon: Tuple[float, float],
+        time_horizon: tuple[float, float],
         num_nodes: int = 50,
     ):
         self.simulator_dynamics = simulator_dynamics
@@ -99,53 +100,59 @@ if __name__ == "__main__":
         time_horizon=(0.0, 10.0),
         num_nodes=10000,
     )
-    out = optimal_cost.solve(jnp.array([0.5 * jnp.pi, 0]))
-    print("Pendulum optimal objective:", out)
+    out = optimal_cost.solve(jnp.array([jnp.pi, 0]))
+    import matplotlib.pyplot as plt
+    plt.plot(optimal_cost.ts, out.xs, label="xs")
+    plt.plot(optimal_cost.ts[:-1], out.us, label="us")
+    plt.legend()
+    plt.show()
 
-    # Bicycle
-    system = Bicycle()
-    costs = BicycleCost()
-    optimal_cost = OptimalCost(
-        simulator_dynamics=system,
-        simulator_costs=costs,
-        time_horizon=(0.0, 10.0),
-        num_nodes=10000,
-    )
-    out = optimal_cost.solve(jnp.array([0.0, 0.0, 0.0, 0.0]))
-    print("Bicycle optimal objective:", out)
+    # print("Pendulum optimal objective:", out)
 
-    # RaceCar
-    system = RaceCar()
-    costs = RaceCarCost()
-    optimal_cost = OptimalCost(
-        simulator_dynamics=system,
-        simulator_costs=costs,
-        time_horizon=(0.0, 10.0),
-        num_nodes=10000,
-    )
-    out = optimal_cost.solve(jnp.array([0, 0, 0, 0, 0, 0], dtype=jnp.float64))
-    print("RaceCar optimal objective:", out)
-
-    # FurutaPendulum
-    system = FurutaPendulum()
-    costs = FurutaPendulumCost()
-    optimal_cost = OptimalCost(
-        simulator_dynamics=system,
-        simulator_costs=costs,
-        time_horizon=(0.0, 10.0),
-        num_nodes=10000,
-    )
-    out = optimal_cost.solve(jnp.array([0.0, 0.0, jnp.pi, 0.0], dtype=jnp.float64))
-    print("FurutaPendulum optimal objective:", out)
-
-    # MountainCar
-    system = MountainCar()
-    costs = MountainCarCost()
-    optimal_cost = OptimalCost(
-        simulator_dynamics=system,
-        simulator_costs=costs,
-        time_horizon=(0.0, 10.0),
-        num_nodes=10000,
-    )
-    out = optimal_cost.solve(jnp.array([-jnp.pi / 6, 0.0]))
-    print("MountainCar optimal objective:", out)
+    # # Bicycle
+    # system = Bicycle()
+    # costs = BicycleCost()
+    # optimal_cost = OptimalCost(
+    #     simulator_dynamics=system,
+    #     simulator_costs=costs,
+    #     time_horizon=(0.0, 10.0),
+    #     num_nodes=10000,
+    # )
+    # out = optimal_cost.solve(jnp.array([0.0, 0.0, 0.0, 0.0]))
+    # print("Bicycle optimal objective:", out)
+    #
+    # # RaceCar
+    # system = RaceCar()
+    # costs = RaceCarCost()
+    # optimal_cost = OptimalCost(
+    #     simulator_dynamics=system,
+    #     simulator_costs=costs,
+    #     time_horizon=(0.0, 10.0),
+    #     num_nodes=10000,
+    # )
+    # out = optimal_cost.solve(jnp.array([0, 0, 0, 0, 0, 0], dtype=jnp.float64))
+    # print("RaceCar optimal objective:", out)
+    #
+    # # FurutaPendulum
+    # system = FurutaPendulum()
+    # costs = FurutaPendulumCost()
+    # optimal_cost = OptimalCost(
+    #     simulator_dynamics=system,
+    #     simulator_costs=costs,
+    #     time_horizon=(0.0, 10.0),
+    #     num_nodes=10000,
+    # )
+    # out = optimal_cost.solve(jnp.array([0.0, 0.0, jnp.pi, 0.0], dtype=jnp.float64))
+    # print("FurutaPendulum optimal objective:", out)
+    #
+    # # MountainCar
+    # system = MountainCar()
+    # costs = MountainCarCost()
+    # optimal_cost = OptimalCost(
+    #     simulator_dynamics=system,
+    #     simulator_costs=costs,
+    #     time_horizon=(0.0, 10.0),
+    #     num_nodes=10000,
+    # )
+    # out = optimal_cost.solve(jnp.array([-jnp.pi / 6, 0.0]))
+    # print("MountainCar optimal objective:", out)
