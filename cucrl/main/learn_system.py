@@ -144,7 +144,7 @@ class LearnSystem:
                                         policy_config=self.interaction.policy)
 
         true_policy = get_interactor(self.x_dim, self.u_dim, true_dynamics_wrapper, initial_condition,
-                                     self.normalizer,self.angle_layer, control_options, offline_planner,
+                                     self.normalizer, self.angle_layer, control_options, offline_planner,
                                      self.config.data_generator.simulator.scaling)
 
         true_data_gen = DataGenerator(data_generation=self.config.data_generator, interactor=true_policy)

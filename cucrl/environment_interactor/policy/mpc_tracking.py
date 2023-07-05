@@ -1,6 +1,7 @@
 from typing import Any, Tuple
 
 import chex
+import jax.debug
 import jax.numpy as jnp
 from jax import random
 from jax.lax import cond
@@ -50,6 +51,13 @@ class MPCTracking(Policy):
         new_key, subkey = random.split(events.mpc_carry.key)
         new_true_policy = self.mpc_tracker.update_mpc(x_k, t_k, tracking_data, events.mpc_carry.mpc_params,
                                                       dynamics_model)
+        # jax.debug.breakpoint()
+        jax.debug.print('new_true_policy: {x}', x=jax.lax.dynamic_slice_in_dim(tracking_data.us, t_k,
+                                                                               self.control_discretization.buffer_steps - 1,
+                                                                               axis=0))
+        jax.debug.print('tracking: {x}', x=jax.lax.dynamic_slice_in_dim(new_true_policy.us, t_k,
+                                                                        self.control_discretization.buffer_steps - 1,
+                                                                        axis=0))
         new_mpc_params = MPCParameters(true_policy=new_true_policy, dynamics_id=events.mpc_carry.mpc_params.dynamics_id)
         new_mpc_carry = MPCCarry(next_update_time=next_update_idx, key=subkey,
                                  mpc_params=new_mpc_params)

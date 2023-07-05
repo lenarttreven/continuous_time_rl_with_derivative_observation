@@ -47,14 +47,18 @@ class TrackingData(NamedTuple):
     xs: chex.Array
     us: chex.Array
 
-    final_t: chex.Array
     target_x: chex.Array
     target_u: chex.Array
+    mpc_control_steps: int
 
     def __call__(self, k: chex.Array):
         assert k.shape == ()
         chex.assert_type(k, int)
         return cond(k >= self.ts.size, self.outside, self.inside, k)
+
+    def _compute_final_t(self):
+        dt = self.ts[1] - self.ts[0]
+        return self.ts[-1] + self.mpc_control_steps * dt
 
     def inside(self, k) -> Tuple[chex.Array, chex.Array, chex.Array]:
         return self.xs[k], self.us[k], self.ts[k]
@@ -62,11 +66,16 @@ class TrackingData(NamedTuple):
     def outside(self, k) -> Tuple[chex.Array, chex.Array, chex.Array]:
         dt = self.ts[1] - self.ts[0]
         num_over = k - self.ts.size + 1
-        t = dt * num_over / (self.final_t - self.ts[-1])
+        t = dt * num_over / (self._compute_final_t() - self.ts[-1])
         x_k = (1 - t) * self.xs[-1] + t * self.target_x
         u_k = (1 - t) * self.us[-1] + t * self.target_u
         t_k = self.ts[-1] + num_over * dt
         return x_k, u_k, t_k
+
+    def check_dtypes(self):
+        chex.assert_type(self.ts, float)
+        chex.assert_type(self.xs, float)
+        chex.assert_type(self.us, float)
 
 
 class PlotOpenLoop(NamedTuple):
