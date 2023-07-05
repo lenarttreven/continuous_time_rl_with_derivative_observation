@@ -7,7 +7,7 @@ from jax.lax import cond
 from trajax.optimizers import ILQRHyperparams, CEMHyperparams, ILQR_with_CEM_warmstart, ILQR
 
 from cucrl.dynamics_with_control.dynamics_models import AbstractDynamics
-from cucrl.main.config import PolicyConfig
+from cucrl.main.config import PolicyConfig, TimeHorizon
 from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanner
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
 from cucrl.utils.classes import OCSolution, DynamicsModel, DynamicsIdentifier
@@ -15,7 +15,7 @@ from cucrl.utils.representatives import MinimizationMethod
 
 
 class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
-    def __init__(self, x_dim: int, u_dim: int, time_horizon: Tuple[float, float], dynamics: AbstractDynamics,
+    def __init__(self, x_dim: int, u_dim: int, time_horizon: TimeHorizon, dynamics: AbstractDynamics,
                  simulator_costs: SimulatorCostsAndConstraints,
                  policy_config: PolicyConfig = PolicyConfig()):
         super().__init__(x_dim=x_dim, u_dim=u_dim, time_horizon=time_horizon, dynamics=dynamics,
@@ -23,14 +23,14 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
         # Number of parameters for eta + number of parameters for control
         self.policy_config = policy_config
         # Setup nodes
-        self.num_control_nodes = policy_config.num_nodes
+        self.num_control_nodes = policy_config.num_control_steps
         self.num_nodes = self.num_control_nodes + 1
         # Setup time
-        total_time = time_horizon[1] - time_horizon[0]
-        total_int_steps = policy_config.num_nodes * policy_config.num_int_step_between_nodes
+        total_time = time_horizon.t_max - time_horizon.t_min
+        total_int_steps = policy_config.num_control_steps * policy_config.num_int_step_between_nodes
         self.dt = total_time / total_int_steps
 
-        self.ts = jnp.linspace(*self.time_horizon, self.num_nodes)
+        self.ts = jnp.linspace(self.time_horizon.t_min, self.time_horizon.t_max, self.num_nodes)
         self.between_control_ts = jnp.linspace(self.ts[0], self.ts[1], policy_config.num_int_step_between_nodes)
         self.num_total_params = (self.x_dim + self.u_dim) * self.num_control_nodes
 

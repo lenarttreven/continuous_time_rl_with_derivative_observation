@@ -5,6 +5,7 @@ import jax.numpy as jnp
 from jax import random, vmap, jit
 from jax.tree_util import tree_map
 
+from cucrl.environment_interactor.discretization.runge_kutta import RungeKutta
 from cucrl.main.config import InteractionConfig
 from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanner
 from cucrl.utils.classes import DynamicsModel, OfflinePlanningData, OCSolution
@@ -21,6 +22,12 @@ class Planner:
 
         self.plan = jit(self.prepare_plan(self.solve))
         self.initialize = jit(self.prepare_plan(self.solve_init))
+        # Here we compute the final time
+        control_discretization = RungeKutta(time_horizon=interaction_config.time_horizon,
+                                            num_control_steps=interaction_config.policy.num_control_steps,
+                                            buffer_control_steps=interaction_config.policy.online_tracking.control_steps + 1)
+
+        self.final_time = control_discretization.continuous_times[-1]
 
     def solve(self, key, x0, dynamics_model: DynamicsModel) -> OCSolution:
         return self.offline_planner.plan_offline(dynamics_model, key, x0)
@@ -42,9 +49,7 @@ class Planner:
                 solver_result = tree_map(lambda x: x[best_index], solver_results)
                 return OfflinePlanningData(ts=solver_result.ts, xs=solver_result.xs, us=solver_result.us,
                                            x0s=jnp.repeat(x0.reshape(1, -1), solver_result.ts.size, axis=0),
-                                           final_t=jnp.array(
-                                               self.interaction_config.policy.online_tracking.time_horizon +
-                                               self.interaction_config.time_horizon[1]),
+                                           final_t=self.final_time,
                                            target_x=self.offline_planner.simulator_costs.state_target,
                                            target_u=self.offline_planner.simulator_costs.action_target,
                                            dynamics_ids=solver_result.dynamics_id)

@@ -9,6 +9,7 @@ from cucrl.dynamics_with_control.dynamics_models import AbstractDynamics
 from cucrl.environment_interactor.measurements_collector.measurements_collector import MeasurementsCollector
 from cucrl.environment_interactor.policy.mpc_tracking import MPCTracking
 from cucrl.main.config import InteractionConfig, Scaling
+from cucrl.main.data_stats import Normalizer
 from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanner
 from cucrl.utils.classes import DynamicsModel, IntegrationCarry, MeasurementSelection
 from cucrl.utils.helper_functions import AngleLayerDynamics
@@ -32,8 +33,9 @@ class Interactor(ABC):
 
 @register_pytree_node_class
 class MPCInteractor(Interactor):
-    def __init__(self, x_dim, u_dim, dynamics: AbstractDynamics, x0s, normalizer, angle_layer: AngleLayerDynamics,
-                 interaction_config: InteractionConfig, offline_planner: AbstractOfflinePlanner, scaling: Scaling):
+    def __init__(self, x_dim: int, u_dim: int, dynamics: AbstractDynamics, x0s: chex.Array, normalizer: Normalizer,
+                 angle_layer: AngleLayerDynamics, interaction_config: InteractionConfig,
+                 offline_planner: AbstractOfflinePlanner, scaling: Scaling):
         self.policy = MPCTracking(x_dim, u_dim, dynamics, x0s, normalizer, angle_layer,
                                   interaction_config, offline_planner, scaling)
 

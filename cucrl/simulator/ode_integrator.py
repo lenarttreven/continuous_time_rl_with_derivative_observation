@@ -181,14 +181,17 @@ class StateDerivativePair:
 class ForwardEuler(Integrator):
     def __init__(self, interactor, simulator_config: SimulatorConfig):
         super().__init__(interactor=interactor, simulator_config=simulator_config)
-        T = simulator_config.time_horizon[1] - simulator_config.time_horizon[0]
+        T = simulator_config.time_horizon.t_max - simulator_config.time_horizon.t_min
         total_int_steps = simulator_config.num_nodes * simulator_config.num_int_step_between_nodes
         self.dt = T / total_int_steps
-        self.ts = jnp.linspace(*simulator_config.time_horizon, simulator_config.num_nodes + 1)
+        self.ts = jnp.linspace(simulator_config.time_horizon.t_min,
+                               simulator_config.time_horizon.t_max,
+                               simulator_config.num_nodes + 1)
         self.between_control_ts = jnp.linspace(self.ts[0], self.ts[1], simulator_config.num_int_step_between_nodes + 1)
 
         total_num_steps = simulator_config.num_int_step_between_nodes * simulator_config.num_nodes + 1
-        self.all_ts = jnp.linspace(*simulator_config.time_horizon, total_num_steps)
+        self.all_ts = jnp.linspace(simulator_config.time_horizon.t_min,
+                                   simulator_config.time_horizon.t_max, total_num_steps)
 
         inner_ts = self.between_control_ts[:-1]
         outer_ts = self.ts[:-1]

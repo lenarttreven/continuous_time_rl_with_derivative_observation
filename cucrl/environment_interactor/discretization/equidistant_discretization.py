@@ -1,19 +1,18 @@
+import abc
 from functools import partial
-from typing import Tuple
+from typing import Tuple, Callable
 
 import chex
 import jax.numpy as jnp
-from flax import struct
 from jax import jit
+from jaxtyping import PyTree
+
+from cucrl.main.config import TimeHorizon
+
+DynamicsFn = Callable[[PyTree, chex.Array, chex.Array], chex.Array]
 
 
-@struct.dataclass
-class TimeHorizon:
-    t_min: float
-    t_max: float
-
-
-class EquidistantDiscretization:
+class EquidistantDiscretization(abc.ABC):
     def __init__(self, time_horizon: TimeHorizon, num_control_steps: int, buffer_control_steps: int = 1):
         """
 
@@ -51,6 +50,10 @@ class EquidistantDiscretization:
         chex.assert_type(t, float)
         assert t.shape == ()
         return jnp.rint((t - self.time_horizon.t_min) / self.dt).astype(int)
+
+    @abc.abstractmethod
+    def discretize(self, dynamics_fn: DynamicsFn) -> DynamicsFn:
+        pass
 
 
 if __name__ == '__main__':

@@ -26,18 +26,19 @@ class OfflinePlanningParams(NamedTuple):
     key: chex.Array
 
 
-class MPCParameters(NamedTuple):
-    dynamics_id: DynamicsIdentifier
-
-
 class TruePolicy(NamedTuple):
-    ts_idx: chex.Array
     us: chex.Array
 
     @jit
-    def __call__(self, t_idx):
-        assert t_idx.shape == ()  # and self.ts_idx[0] <= t_idx <= self.ts_idx[-1]
-        return self.us[t_idx - self.ts_idx[0]]
+    def __call__(self, t_k: chex.Array):
+        chex.assert_type(t_k, int)
+        assert t_k.shape == ()  # and self.ts_idx[0] <= t_idx <= self.ts_idx[-1]
+        return self.us[t_k]
+
+
+class MPCParameters(NamedTuple):
+    dynamics_id: DynamicsIdentifier
+    true_policy: TruePolicy
 
 
 class TrackingData(NamedTuple):
@@ -108,7 +109,6 @@ class MPCCarry(NamedTuple):
     next_update_time: chex.Array | None = None
     key: chex.Array | None = None
     mpc_params: MPCParameters | None = None
-    true_policy: TruePolicy | None = None
 
 
 class CollectorCarry(NamedTuple):

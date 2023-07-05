@@ -9,8 +9,8 @@ import wandb
 from cucrl.main.config import LearningRate, OptimizerConfig, OptimizersConfig, OfflinePlanningConfig
 from cucrl.main.config import LoggingConfig, Scaling, TerminationConfig, OnlineTrackingConfig, BatchSize
 from cucrl.main.config import MeasurementCollectionConfig, TimeHorizonConfig, PolicyConfig, ComparatorConfig
-from cucrl.main.config import RunConfig, DataGeneratorConfig, DynamicsConfig, InteractionConfig, SimulatorConfig, \
-    DataCollection
+from cucrl.main.config import RunConfig, DataGeneratorConfig, DynamicsConfig, InteractionConfig, SimulatorConfig
+from cucrl.main.config import TimeHorizon, DataCollection
 from cucrl.main.learn_system import LearnSystem
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.helper_functions import namedtuple_to_dict
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     num_visualization_points = 1000
 
     initial_conditions = [jnp.array([jnp.pi, 0])]
-    time_horizon = (0, 10)
+    time_horizon = TimeHorizon(t_min=0, t_max=10)
     noise_scalar = 0.01
     stds_for_simulation = jnp.array([noise_scalar, noise_scalar], dtype=jnp.float64)
     simulator_parameters = {'system_params': jnp.array([5.0, 9.81], jnp.float64)}
@@ -90,11 +90,11 @@ if __name__ == '__main__':
         interaction=InteractionConfig(
             time_horizon=time_horizon,
             policy=PolicyConfig(
-                num_nodes=1000,
+                num_control_steps=100,
                 num_int_step_between_nodes=10,
                 online_tracking=OnlineTrackingConfig(
                     mpc_update_period=1,
-                    time_horizon=4.0,
+                    control_steps=20,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(

@@ -8,6 +8,7 @@ from jax import random
 from jax.lax import cond
 
 from cucrl.dynamics_with_control.dynamics_models import AbstractDynamics
+from cucrl.environment_interactor.discretization.runge_kutta import RungeKutta
 from cucrl.environment_interactor.measurements_collector.abstract_measurement_collector import \
     AbstractMeasurementsCollector
 from cucrl.environment_interactor.mpc_tracker import MPCTracker
@@ -45,12 +46,19 @@ HallucinationOut = Tuple[MeasurementSelection, IntegrationCarry]
 class MeasurementsCollector(AbstractMeasurementsCollector):
     def __init__(self, x_dim: int, u_dim: int, dynamics: AbstractDynamics, interaction_config: InteractionConfig,
                  offline_planner: AbstractOfflinePlanner, scaling: Scaling, num_traj: int):
+        control_discretization = RungeKutta(time_horizon=interaction_config.time_horizon,
+                                            num_control_steps=interaction_config.policy.num_control_steps,
+                                            buffer_control_steps=interaction_config.policy.online_tracking.control_steps + 1)
+
         self.mpc_tracker = MPCTracker(x_dim=x_dim, u_dim=u_dim, scaling=scaling, dynamics=dynamics,
                                       simulator_costs=offline_planner.simulator_costs,
-                                      interaction_config=interaction_config)
+                                      interaction_config=interaction_config,
+                                      control_discretization=control_discretization)
 
-        self.all_ts = jnp.linspace(*interaction_config.time_horizon, interaction_config.policy.num_nodes + 1)
-        self.all_ts_idx = jnp.arange(interaction_config.policy.num_nodes + 1)
+        self.all_ts = jnp.linspace(interaction_config.time_horizon.t_min,
+                                   interaction_config.time_horizon.t_max,
+                                   interaction_config.policy.num_control_steps + 1)
+        self.all_ts_idx = jnp.arange(interaction_config.policy.num_control_steps + 1)
 
         self.interaction_config = interaction_config
         self.num_traj = num_traj
@@ -62,8 +70,8 @@ class MeasurementsCollector(AbstractMeasurementsCollector):
 
         # Prepare inner dt
         policy_config = interaction_config.policy
-        total_time = interaction_config.time_horizon[1] - interaction_config.time_horizon[0]
-        total_int_steps = policy_config.num_nodes * policy_config.num_int_step_between_nodes
+        total_time = interaction_config.time_horizon.length()
+        total_int_steps = policy_config.num_control_steps * policy_config.num_int_step_between_nodes
         self.inner_dt = total_time / total_int_steps
         self.ts_inner_nodes = jnp.linspace(self.all_ts[0], self.all_ts[1], policy_config.num_int_step_between_nodes + 1)
 

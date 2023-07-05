@@ -1,12 +1,23 @@
-from typing import NamedTuple, Dict, List, Callable, Tuple
+from typing import NamedTuple, Dict, List, Callable
 
 import jax
+from flax import struct
 from jax import random, numpy as jnp
 
 from cucrl.schedules.learning_rate import LearningRateType
 from cucrl.utils.representatives import BetaType, BNNTypes, BatchStrategy
 from cucrl.utils.representatives import Optimizer, Dynamics, SimulatorType, TimeHorizonType
 from cucrl.utils.representatives import SmootherType, ExplorationStrategy, DynamicsTracking, MinimizationMethod
+
+
+@struct.dataclass
+class TimeHorizon:
+    t_min: float
+    t_max: float
+
+
+    def length(self) -> float:
+        return self.t_max - self.t_min
 
 
 class Scaling(NamedTuple):
@@ -31,7 +42,7 @@ class SimulatorConfig(NamedTuple):
     simulator_params: Dict
     num_nodes: int
     num_int_step_between_nodes: int
-    time_horizon: Tuple[float, float]
+    time_horizon: TimeHorizon
     termination_config: TerminationConfig = TerminationConfig()
 
 
@@ -102,25 +113,24 @@ class OfflinePlanningConfig(NamedTuple):
 
 class OnlineTrackingConfig(NamedTuple):
     mpc_update_period: int = 1
-    time_horizon: float = 2.0
+    control_steps: int = 20
     dynamics_tracking: DynamicsTracking = DynamicsTracking.MEAN
 
 
 class PolicyConfig(NamedTuple):
     offline_planning: OfflinePlanningConfig = OfflinePlanningConfig()
     online_tracking: OnlineTrackingConfig = OnlineTrackingConfig()
-    num_nodes: int = 100
+    num_control_steps: int = 100
     num_int_step_between_nodes: int = 10
     initial_control: float | jnp.ndarray | Callable = 0.0
 
 
 class InteractionConfig(NamedTuple):
-    time_horizon: Tuple[float, float] = (0, 10)
+    time_horizon: TimeHorizon = TimeHorizon(t_min=0.0, t_max=10.0)
     angles_dim: List[int] = []
     policy: PolicyConfig = PolicyConfig()
     system_assumptions: SystemAssumptions = SystemAssumptions()
     measurement_collector: MeasurementCollectionConfig = MeasurementCollectionConfig()
-
 
 
 class OptimizerConfig(NamedTuple):

@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Tuple, NamedTuple
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -7,6 +7,7 @@ from jax import jit, vmap
 from jax.lax import scan, cond
 from trajax.optimizers import ILQR, ILQRHyperparams, CEMHyperparams, CEM
 
+from cucrl.main.config import TimeHorizon
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
 from cucrl.simulator.simulator_dynamics import SimulatorDynamics
 
@@ -18,14 +19,14 @@ class _IntegrateCarry(NamedTuple):
 
 class BestPossibleDiscreteAlgorithm:
     def __init__(self, simulator_dynamics: SimulatorDynamics, simulator_costs: SimulatorCostsAndConstraints,
-                 time_horizon: Tuple[float, float], num_nodes: int):
+                 time_horizon: TimeHorizon, num_nodes: int):
         self.simulator_dynamics = simulator_dynamics
         self.simulator_cost = simulator_costs
         self.time_horizon = time_horizon
         self.num_nodes = num_nodes
 
         self.num_action_nodes = self.num_nodes - 1
-        self.dt = (self.time_horizon[1] - self.time_horizon[0]) / self.num_action_nodes
+        self.dt = self.time_horizon.length() / self.num_action_nodes
 
         self.initial_actions = jnp.zeros(shape=(self.num_action_nodes, self.simulator_dynamics.control_dim))
 
@@ -104,7 +105,7 @@ class BestPossibleDiscreteAlgorithm:
 
         self.best_xs_all = xs_all
         self.best_us_all = us_all
-        self.ts_all = jnp.linspace(self.time_horizon[0], self.time_horizon[1], xs_all.shape[0])
+        self.ts_all = jnp.linspace(self.time_horizon.t_min, self.time_horizon.t_max, xs_all.shape[0])
 
         true_cost = self.cost_fn_eval(xs_all, us_all)
         return true_cost

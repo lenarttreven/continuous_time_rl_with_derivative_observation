@@ -42,6 +42,8 @@ class TimeSampler:
 
     def time_steps(self, beta: chex.Array) -> chex.Array:
         time_horizon = self.time_horizon(beta)
-        ts_nodes = jnp.linspace(*self.interaction_config.time_horizon, self.interaction_config.policy.num_nodes + 1)
+        ts_nodes = jnp.linspace(self.interaction_config.time_horizon.t_min,
+                                self.interaction_config.time_horizon.t_min,
+                                self.interaction_config.policy.num_control_steps + 1)
         num_nodes = jnp.sum(ts_nodes <= time_horizon)
         return num_nodes

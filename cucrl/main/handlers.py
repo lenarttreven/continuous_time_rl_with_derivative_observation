@@ -49,7 +49,7 @@ class DataGenerator:
 
         self.num_trajectories = len(self.initial_conditions)
         self.time_horizon = data_generation.simulator.time_horizon
-        self.visualization_times_whole_horizon = jnp.linspace(*self.time_horizon,
+        self.visualization_times_whole_horizon = jnp.linspace(self.time_horizon.t_min, self.time_horizon.t_max,
                                                               self.num_visualization_points).reshape(-1, 1)
         self.simulator_type = data_generation.simulator.simulator_type
         observation_noise = data_generation.data_collection.noise

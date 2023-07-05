@@ -12,7 +12,6 @@ from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanne
 from cucrl.utils.classes import IntegrationCarry, TrackingData, MPCCarry, DynamicsModel
 from cucrl.utils.classes import OfflinePlanningData
 from cucrl.utils.helper_functions import AngleLayerDynamics
-from cucrl.environment_interactor.discretization.runge_kutta import RungeKutta
 
 # PolicyOit is the output of the policy and represents: [us, t_next, events]
 PolicyOut = Tuple[jax.Array, jax.Array, IntegrationCarry]
@@ -40,8 +39,9 @@ class Policy(ABC):
 
             return initial_control
         elif callable(self.interaction_config.policy.initial_control):
-            outer_ts_nodes = jnp.linspace(*self.interaction_config.time_horizon,
-                                          self.interaction_config.policy.num_nodes + 1)
+            outer_ts_nodes = jnp.linspace(self.interaction_config.time_horizon.t_min,
+                                          self.interaction_config.time_horizon.t_max,
+                                          self.interaction_config.policy.num_control_steps + 1)
 
             def initial_control(x_k, t_k):
                 return self.interaction_config.policy.initial_control(x_k, outer_ts_nodes[t_k])
