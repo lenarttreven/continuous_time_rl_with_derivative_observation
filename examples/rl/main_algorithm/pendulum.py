@@ -94,7 +94,7 @@ if __name__ == '__main__':
                 num_int_step_between_nodes=10,
                 online_tracking=OnlineTrackingConfig(
                     mpc_update_period=1,
-                    control_steps=20,
+                    control_steps=30,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(

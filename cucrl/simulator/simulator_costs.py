@@ -108,7 +108,7 @@ class Pendulum(SimulatorCostsAndConstraints):
         self.terminal_r = 0 * jnp.eye(self.control_dim)
 
         self.tracking_q = jnp.eye(self.state_dim)
-        self.tracking_r = jnp.eye(self.control_dim)
+        self.tracking_r = 0.01 * jnp.eye(self.control_dim)
         self.tracking_q_T = jnp.eye(self.state_dim)
         self.tracking_r_T = 0 * jnp.eye(self.control_dim)
 
