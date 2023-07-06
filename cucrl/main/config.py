@@ -15,7 +15,6 @@ class TimeHorizon:
     t_min: float
     t_max: float
 
-
     def length(self) -> float:
         return self.t_max - self.t_min
 
@@ -40,7 +39,7 @@ class SimulatorConfig(NamedTuple):
     scaling: Scaling
     simulator_type: SimulatorType
     simulator_params: Dict
-    num_nodes: int
+    num_control_nodes: int
     num_int_step_between_nodes: int
     time_horizon: TimeHorizon
     termination_config: TerminationConfig = TerminationConfig()
@@ -108,7 +107,7 @@ class OfflinePlanningConfig(NamedTuple):
     num_independent_runs: int = 3
     exploration_strategy: ExplorationStrategy = ExplorationStrategy.MEAN
     beta_exploration: BetaType = BetaType.GP
-    minimization_method: MinimizationMethod = MinimizationMethod.ILQR_WITH_CEM
+    minimization_method: MinimizationMethod = MinimizationMethod.ILQR
 
 
 class OnlineTrackingConfig(NamedTuple):

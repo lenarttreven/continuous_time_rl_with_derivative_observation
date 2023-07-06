@@ -63,7 +63,7 @@ if __name__ == '__main__':
                                 time_scaling=jnp.ones(shape=(1,))),
                 simulator_type=SimulatorType.PENDULUM,
                 simulator_params=simulator_parameters,
-                num_nodes=100,
+                num_control_nodes=100,
                 num_int_step_between_nodes=10,
                 time_horizon=time_horizon,
                 termination_config=TerminationConfig(episode_budget_running_cost=1500.0,
@@ -94,7 +94,7 @@ if __name__ == '__main__':
                 num_int_step_between_nodes=10,
                 online_tracking=OnlineTrackingConfig(
                     mpc_update_period=1,
-                    control_steps=30,
+                    control_steps=20,
                     dynamics_tracking=DynamicsTracking.MEAN
                 ),
                 offline_planning=OfflinePlanningConfig(

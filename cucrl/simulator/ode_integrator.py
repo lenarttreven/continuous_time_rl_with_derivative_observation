@@ -181,15 +181,15 @@ class StateDerivativePair:
 class ForwardEuler(Integrator):
     def __init__(self, interactor, simulator_config: SimulatorConfig):
         super().__init__(interactor=interactor, simulator_config=simulator_config)
-        T = simulator_config.time_horizon.t_max - simulator_config.time_horizon.t_min
-        total_int_steps = simulator_config.num_nodes * simulator_config.num_int_step_between_nodes
+        T = simulator_config.time_horizon.length()
+        total_int_steps = simulator_config.num_control_nodes * simulator_config.num_int_step_between_nodes
         self.dt = T / total_int_steps
         self.ts = jnp.linspace(simulator_config.time_horizon.t_min,
                                simulator_config.time_horizon.t_max,
-                               simulator_config.num_nodes + 1)
+                               simulator_config.num_control_nodes + 1)
         self.between_control_ts = jnp.linspace(self.ts[0], self.ts[1], simulator_config.num_int_step_between_nodes + 1)
 
-        total_num_steps = simulator_config.num_int_step_between_nodes * simulator_config.num_nodes + 1
+        total_num_steps = simulator_config.num_int_step_between_nodes * simulator_config.num_control_nodes + 1
         self.all_ts = jnp.linspace(simulator_config.time_horizon.t_min,
                                    simulator_config.time_horizon.t_max, total_num_steps)
 
@@ -227,7 +227,7 @@ class ForwardEuler(Integrator):
         init = _IntegrationCarry(x=ic, t=jnp.array(0), terminate_condition=jnp.array(False),
                                  traj_idx=traj_idx, events=events)
 
-        new_carry, to_return = scan(self.integration_step, init, None, length=self.simulator_config.num_nodes)
+        new_carry, to_return = scan(self.integration_step, init, None, length=self.simulator_config.num_control_nodes)
         return to_return
 
     def simulate(self, ic, time_horizon, traj_idx, events):
