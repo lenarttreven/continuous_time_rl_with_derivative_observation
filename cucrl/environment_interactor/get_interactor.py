@@ -1,4 +1,4 @@
-from cucrl.environment_interactor.interactor import MPCInteractor
+from cucrl.environment_interactor.mpc_interactor import MPCInteractor
 
 
 def get_interactor(*args):

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from functools import partial
 from typing import Any
 
+import chex
 import jax.numpy as jnp
 from jax import jit
 
@@ -35,6 +36,15 @@ class SimulatorCostsAndConstraints(ABC):
         self.state_scaling_inv = jnp.linalg.inv(state_scaling)
         self.control_scaling = control_scaling
         self.control_scaling_inv = jnp.linalg.inv(control_scaling)
+        self._x0: chex.Array | None = None
+
+    def get_x0(self) -> chex.Array:
+        assert self._x0.shape == (self.state_dim,)
+        return self._x0
+
+    @abstractmethod
+    def _get_x0(self) -> chex.Array:
+        pass
 
     @partial(jit, static_argnums=0)
     def running_cost(self, x, u) -> jnp.ndarray:

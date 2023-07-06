@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from functools import partial
 from typing import Tuple, Any, NamedTuple
 
+import chex
 import jax
 import jax.numpy as jnp
 from jax import jit
@@ -189,8 +190,8 @@ class VanDerPolOscilator(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None,
                  control_scaling=None):
         super().__init__(state_dim=2, control_dim=1, system_params=None,
-                                                 time_scaling=time_scaling,
-                                                 state_scaling=state_scaling, control_scaling=control_scaling)
+                         time_scaling=time_scaling,
+                         state_scaling=state_scaling, control_scaling=control_scaling)
 
     def _dynamics(self, x, u, t):
         x0_dot = x[1]
@@ -202,8 +203,8 @@ class Glucose(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None,
                  control_scaling=None):
         super().__init__(state_dim=2, control_dim=1, system_params=None,
-                                      time_scaling=time_scaling, state_scaling=state_scaling,
-                                      control_scaling=control_scaling)
+                         time_scaling=time_scaling, state_scaling=state_scaling,
+                         control_scaling=control_scaling)
 
         self.a = 1.0
         self.b = 1.0
@@ -682,8 +683,8 @@ class RaceCar(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None, params: CarParams = CarParams(),
                  control_scaling=None, control_ratio: int = 10):
         super().__init__(state_dim=6, control_dim=2, system_params=None,
-                                      time_scaling=time_scaling, state_scaling=state_scaling,
-                                      control_scaling=control_scaling)
+                         time_scaling=time_scaling, state_scaling=state_scaling,
+                         control_scaling=control_scaling)
         self.control_ratio = control_ratio
         self.system_params = params
 
@@ -841,8 +842,8 @@ class CancerTreatment(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None,
                  control_scaling=None):
         super().__init__(state_dim=1, control_dim=1, system_params=None,
-                                              time_scaling=time_scaling, state_scaling=state_scaling,
-                                              control_scaling=control_scaling)
+                         time_scaling=time_scaling, state_scaling=state_scaling,
+                         control_scaling=control_scaling)
 
         self.r = 0.3
         """Growth rate of the tumour"""
@@ -862,8 +863,8 @@ class HIVTreatment(SimulatorDynamics):
     def __init__(self, time_scaling=None, state_scaling=None,
                  control_scaling=None):
         super().__init__(state_dim=3, control_dim=1, system_params=None,
-                                           time_scaling=time_scaling, state_scaling=state_scaling,
-                                           control_scaling=control_scaling)
+                         time_scaling=time_scaling, state_scaling=state_scaling,
+                         control_scaling=control_scaling)
 
         self.s = 10.
         self.m_1 = .02
