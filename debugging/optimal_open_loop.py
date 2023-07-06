@@ -164,3 +164,11 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
     print(track_values.opt_value)
+
+    # Need to run test that checks that the tracking trajectory is close to the open loop trajectory
+    import numpy as np
+
+    for i in range(10):
+        # Check if the i-th slice in the first array is equal to the corresponding slice in the second array
+        np.testing.assert_allclose(track_values.xs[i, :, :],
+                                   plan_out.xs[i:i + 11, :])
