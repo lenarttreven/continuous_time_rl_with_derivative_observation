@@ -5,14 +5,13 @@ import jax.numpy as jnp
 from jax.lax import dynamic_update_slice_in_dim
 
 from cucrl.dynamics_with_control.dynamics_models import AbstractDynamics
+from cucrl.environment_interactor.discretization.equidistant_discretization import EquidistantDiscretization
 from cucrl.main.config import Scaling, InteractionConfig
 from cucrl.online_tracker.online_tracker_ilqr import ILQROnlineTracking
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
+from cucrl.utils.classes import TrackingData
 from cucrl.utils.classes import TruePolicy, MPCParameters, DynamicsModel
 from cucrl.utils.helper_functions import AngleNormalizer
-from cucrl.utils.classes import TrackingData
-from cucrl.environment_interactor.discretization.equidistant_discretization import EquidistantDiscretization
-
 
 pytree = Any
 
@@ -28,8 +27,7 @@ class MPCTracker:
                                                 state_scaling=scaling.state_scaling)
 
         self.mpc_tracker = ILQROnlineTracking(x_dim=x_dim, u_dim=u_dim, dynamics=dynamics,
-                                              simulator_costs=simulator_costs, interaction_config=interaction_config,
-                                              control_discretization=control_discretization)
+                                              simulator_costs=simulator_costs, interaction_config=interaction_config)
 
     def update_mpc(self, x_k: chex.Array, t_k: chex.Array, tracking_data: TrackingData, mpc_params: MPCParameters,
                    dynamics_model: DynamicsModel) -> TruePolicy:

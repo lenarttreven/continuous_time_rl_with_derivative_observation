@@ -13,48 +13,32 @@ from cucrl.online_tracker.abstract_online_tracker import AbstractOnlineTracker
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
 from cucrl.utils.classes import OCSolution, TrackingData, MPCParameters, DynamicsModel, DynamicsIdentifier
 from cucrl.utils.representatives import DynamicsTracking
-from cucrl.environment_interactor.discretization.equidistant_discretization import EquidistantDiscretization
 
 
-
-class DynamicsILQR(NamedTuple):
+class TrackingParams(NamedTuple):
     dynamics_model: DynamicsModel
     mpc_params: MPCParameters
-    us_track: TrackingData
-    ts_track: chex.Array
-
-
-class CostILQR(NamedTuple):
-    xs_track: chex.Array
-    ts_track: chex.Array
-    dynamics_model: DynamicsModel
+    tracking_data: TrackingData
+    t_idx_start: chex.Array
 
 
 class ILQROnlineTracking(AbstractOnlineTracker):
     def __init__(self, x_dim: int, u_dim: int, dynamics: AbstractDynamics,
-                 simulator_costs: SimulatorCostsAndConstraints, interaction_config: InteractionConfig,
-                 control_discretization: EquidistantDiscretization):
+                 simulator_costs: SimulatorCostsAndConstraints, interaction_config: InteractionConfig):
         super().__init__(x_dim=x_dim, u_dim=u_dim, time_horizon=interaction_config.time_horizon, dynamics=dynamics,
                          simulator_costs=simulator_costs)
-        self.control_discretization = control_discretization
         self.interaction_config = interaction_config
-        # Setup time
-        # ts_nodes = jnp.linspace(*interaction_config.time_horizon, interaction_config.policy.num_nodes + 1)
-        policy_config = interaction_config.policy
-        # self.num_nodes = jnp.sum(ts_nodes <= policy_config.online_tracking.time_horizon)
-        # self.ts = ts_nodes[:self.num_nodes]
-        # self.all_ts = ts_nodes
-
-        self.between_control_ts = jnp.linspace(self.control_discretization.continuous_times[0],
-                                               self.control_discretization.continuous_times[1],
-                                               policy_config.num_int_step_between_nodes + 1)
 
         policy_config = interaction_config.policy
-        total_time = interaction_config.time_horizon.t_max - interaction_config.time_horizon.t_min
+        total_time = interaction_config.time_horizon.length()
         total_int_steps = policy_config.num_control_steps * policy_config.num_int_step_between_nodes
-        self._dt = total_time / total_int_steps
+        self.dt = total_time / total_int_steps
+        self.large_dt = total_time / policy_config.num_control_steps
+
         self.control_steps = self.interaction_config.policy.online_tracking.control_steps
         self.ts_indices = jnp.arange(self.control_steps)
+
+        self.between_step_indices = jnp.arange(policy_config.num_int_step_between_nodes)
 
         # Setup optimizer
         self.ilqr = ILQR(self.cost_fn, self.dynamics_fn)
@@ -79,44 +63,39 @@ class ILQROnlineTracking(AbstractOnlineTracker):
             raise NotImplementedError(f'Unknown dynamics tracking: '
                                       f'{self.interaction_config.policy.online_tracking.dynamics_tracking}')
 
-    def dynamics_fn(self, x_k: chex.Array, u_k: chex.Array, k: chex.Array, dynamics_ilqr: DynamicsILQR):
+    def dynamics_fn(self, x_k: chex.Array, delta_u_k: chex.Array, k: chex.Array, tracking_params: TrackingParams):
         # t will go over array [0, ..., num_nodes - 1]
-        assert x_k.shape == (self.x_dim,) and u_k.shape == (self.u_dim,) and k.shape == ()
+        assert x_k.shape == (self.x_dim,) and delta_u_k.shape == (self.u_dim,) and k.shape == ()
         chex.assert_type(k, int)
-        # dynamics_ilqr.us_track is a (num_nodes - 1, u_dim) array
 
-        indices = k + self.ts_indices
-        cur_ts = vmap(self.control_discretization.discrete_to_continuous)(indices)
+        indices = k + self.between_step_indices
+        tracking_k = k + tracking_params.t_idx_start
 
-        def _next_step(x: chex.Array, t: chex.Array) -> Tuple[chex.Array, chex.Array]:
-            x_dot = self.ode(x, u_k + dynamics_ilqr.us_track[k], dynamics_ilqr.dynamics_model)
-            x_next = x + self._dt * x_dot
+        def _next_step(x: chex.Array, _: chex.Array) -> Tuple[chex.Array, chex.Array]:
+            tracking_u_k = tracking_params.tracking_data(tracking_k)[1]
+            x_dot = self.ode(x, delta_u_k + tracking_u_k, tracking_params.dynamics_model)
+            x_next = x + self.dt * x_dot
             return x_next, x_next
 
-        x_k_next, _ = jax.lax.scan(_next_step, x_k, cur_ts)
+        x_k_next, _ = jax.lax.scan(_next_step, x_k, indices)
         return x_k_next
 
-    def cost_fn(self, x_k, u_k, k, cost_ilqr: CostILQR):
-        assert x_k.shape == (self.x_dim,) and u_k.shape == (self.u_dim,) and k.shape == ()
+    def cost_fn(self, x_k, delta_u_k, k, tracking_params: TrackingParams):
+        assert x_k.shape == (self.x_dim,) and delta_u_k.shape == (self.u_dim,) and k.shape == ()
         chex.assert_type(k, int)
+        tracking_k = k + tracking_params.t_idx_start
 
-        def running_cost(x, u, t):
-            init_time = self.control_discretization.discrete_to_continuous(k)
-            cur_ts = init_time + self.between_control_ts
+        def running_cost(_x_k, _delta_u_k, _t_k):
+            x_tracking = tracking_params.tracking_data(_t_k)[0]
+            x_error = _x_k - x_tracking
+            return self.large_dt * self.simulator_costs.tracking_running_cost(x_error, _delta_u_k)
 
-            def _next_step(_x: chex.Array, _t: chex.Array) -> Tuple[chex.Array, chex.Array]:
-                x_dot = self.ode(_x, u, cost_ilqr.dynamics_model)
-                x_next = _x + self._dt * x_dot
-                return x_next, self._dt * self.simulator_costs.running_cost(_x, u)
+        def terminal_cost(_x_k, _delta_u_k, _t_k):
+            x_tracking = tracking_params.tracking_data(_t_k)[0]
+            x_error = _x_k - x_tracking
+            return self.simulator_costs.tracking_terminal_cost(x_error, _delta_u_k)
 
-            x_last, cs = jax.lax.scan(_next_step, x, cur_ts)
-            assert cs.shape == (self.interaction_config.policy.num_int_step_between_nodes + 1,)
-            return jnp.sum(cs)
-
-        def terminal_cost(x, u, t):
-            return self.simulator_costs.terminal_cost(x, u)
-
-        return cond(k == self.control_steps, terminal_cost, running_cost, x_k, u_k, k)
+        return cond(k == self.control_steps, terminal_cost, running_cost, x_k, delta_u_k, tracking_k)
 
     def prepare_tracking_data(self, tracking_data: TrackingData, t_start):
         t_indices = t_start + self.ts_indices
@@ -126,17 +105,19 @@ class ILQROnlineTracking(AbstractOnlineTracker):
                      tracking_data: TrackingData, t_start_idx: chex.Array) -> OCSolution:
         assert t_start_idx.shape == ()
         chex.assert_type(t_start_idx, int)
-        # xs_track, us_track are of shape (num_nodes, x_dim) and (num_nodes - 1, u_dim) respectively
-        xs_track, us_track, ts_track = self.prepare_tracking_data(tracking_data, t_start_idx)
 
-        dynamics_ilqr = DynamicsILQR(dynamics_model=dynamics_model, mpc_params=mpc_params, us_track=us_track,
-                                     ts_track=ts_track, )
-        cost_ilqr = CostILQR(xs_track=xs_track, ts_track=ts_track, dynamics_model=dynamics_model)
+        tracking_params = TrackingParams(dynamics_model=dynamics_model,
+                                         mpc_params=mpc_params,
+                                         tracking_data=tracking_data,
+                                         t_idx_start=t_start_idx)
 
-        results = self.ilqr.solve(cost_ilqr, dynamics_ilqr, initial_conditions, self.u_init, self.ilqr_hyperparams)
+        results = self.ilqr.solve(tracking_params, tracking_params, initial_conditions, self.u_init,
+                                  self.ilqr_hyperparams)
 
         jax.debug.print('Objective value: {x}', x=results.obj)
         xs, delta_us = results.xs, results.us
+        ts_indices = t_start_idx + jnp.arange(self.control_steps + 1)
+        us, ts = vmap(tracking_data)(ts_indices)[1:]
+        delta_us = jnp.concatenate([delta_us, delta_us[-1:]], axis=0)
 
-        xs_o, us_o = xs_track, us_track
-        return OCSolution(ts_track, xs, us_o + delta_us, results.obj, mpc_params.dynamics_id)
+        return OCSolution(ts, xs, us + delta_us, results.obj, mpc_params.dynamics_id)

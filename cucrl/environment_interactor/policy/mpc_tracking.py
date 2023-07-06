@@ -97,8 +97,13 @@ class MPCTracking(Policy):
             offline_planning_data = self.planner.plan(
                 dynamics_model=dynamics_model, initial_conditions=self.initial_conditions, key=subkey)
 
+        mpc_control_steps = jnp.repeat(
+            jnp.array(self.interaction_config.policy.online_tracking.control_steps)[None, ...], repeats=self.num_traj,
+            axis=0)
+
         tracking_data = TrackingData(ts=offline_planning_data.ts, xs=offline_planning_data.xs,
-                                     us=offline_planning_data.us, final_t=offline_planning_data.final_t,
+                                     us=offline_planning_data.us,
+                                     mpc_control_steps=mpc_control_steps,
                                      target_x=offline_planning_data.target_x, target_u=offline_planning_data.target_u)
 
         next_update_time = jnp.zeros(shape=(self.num_traj,), dtype=jnp.int64)

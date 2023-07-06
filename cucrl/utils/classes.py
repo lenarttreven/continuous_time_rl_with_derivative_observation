@@ -49,7 +49,7 @@ class TrackingData(NamedTuple):
 
     target_x: chex.Array
     target_u: chex.Array
-    mpc_control_steps: int
+    mpc_control_steps: chex.Array
 
     def __call__(self, k: chex.Array):
         assert k.shape == ()
@@ -76,6 +76,9 @@ class TrackingData(NamedTuple):
         chex.assert_type(self.ts, float)
         chex.assert_type(self.xs, float)
         chex.assert_type(self.us, float)
+        chex.assert_type(self.target_x, float)
+        chex.assert_type(self.target_u, float)
+        chex.assert_type(self.mpc_control_steps, int)
 
 
 class PlotOpenLoop(NamedTuple):

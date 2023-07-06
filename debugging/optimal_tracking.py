@@ -35,6 +35,7 @@ class OnlineTracking:
         total_time = time_horizon.length()
         total_int_steps = policy_config.num_control_steps * policy_config.num_int_step_between_nodes
         self.dt = total_time / total_int_steps
+        self.large_dt = total_time / policy_config.num_control_steps
 
         self.control_steps = policy_config.online_tracking.control_steps
         self.between_step_indices = jnp.arange(policy_config.num_int_step_between_nodes)
@@ -89,7 +90,7 @@ class OnlineTracking:
         def running_cost(_x_k, _delta_u_k, _t_k):
             x_tracking = tracking_params.tracking_data(_t_k)[0]
             x_error = _x_k - x_tracking
-            return self.costs.tracking_running_cost(x_error, _delta_u_k)
+            return self.large_dt * self.costs.tracking_running_cost(x_error, _delta_u_k)
 
         def terminal_cost(_x_k, _delta_u_k, _t_k):
             x_tracking = tracking_params.tracking_data(_t_k)[0]

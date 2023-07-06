@@ -26,9 +26,10 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
         self.num_control_nodes = policy_config.num_control_steps
         self.num_nodes = self.num_control_nodes + 1
         # Setup time
-        total_time = time_horizon.t_max - time_horizon.t_min
+        total_time = time_horizon.length()
         total_int_steps = policy_config.num_control_steps * policy_config.num_int_step_between_nodes
         self.dt = total_time / total_int_steps
+
 
         self.ts = jnp.linspace(self.time_horizon.t_min, self.time_horizon.t_max, self.num_nodes)
         self.between_control_ts = jnp.linspace(self.ts[0], self.ts[1], policy_config.num_int_step_between_nodes)
@@ -68,7 +69,7 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
         assert x.shape == (self.x_dim,) and u.shape == (self.u_dim + self.x_dim,) and t.shape == ()
         chex.assert_type(t, int)
 
-        cur_ts = self.ts[t] + self.between_control_ts[:-1]
+        cur_ts = self.ts[t] + self.between_control_ts
 
         def _next_step(_x: chex.Array, _t: chex.Array) -> Tuple[chex.Array, chex.Array]:
             x_dot = self.ode(_x, u[:self.u_dim], u[self.u_dim:], dynamics_model)
@@ -82,7 +83,7 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
         assert x.shape == (self.x_dim,) and u.shape == (self.x_dim + self.u_dim,)
 
         def running_cost(_x, _u, _t):
-            cur_ts = self.ts[_t] + self.between_control_ts[:-1]
+            cur_ts = self.ts[_t] + self.between_control_ts
 
             def _next_step(_x_: chex.Array, _t_: chex.Array) -> Tuple[chex.Array, chex.Array]:
                 x_dot = self.ode(_x_, _u[:self.u_dim], _u[self.u_dim:], dynamics_model)
@@ -90,7 +91,7 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
                 return x_next, self.dt * self.simulator_costs.running_cost(_x_, _u[:self.u_dim])
 
             x_last, cs = jax.lax.scan(_next_step, _x, cur_ts)
-            assert cs.shape == (self.policy_config.num_int_step_between_nodes - 1,)
+            assert cs.shape == (self.policy_config.num_int_step_between_nodes,)
             return jnp.sum(cs)
 
         def terminal_cost(_x, _u, _t):
@@ -113,8 +114,5 @@ class EtaTimeOfflinePlanner(AbstractOfflinePlanner):
 
         us = results.us[:, :self.u_dim]
         us = jnp.concatenate([us, us[-1][None, :]])
-        # eps = results.us[:, self.u_dim:]
-        # eps = jnp.tanh(eps)
-        # eps = jnp.concatenate([eps, eps[-1][None, :]])
         return OCSolution(ts=self.ts, xs=results.xs, us=us, opt_value=results.obj,
                           dynamics_id=self.example_dynamics_id())
