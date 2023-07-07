@@ -39,7 +39,7 @@ class SACInteractor(Interactor):
         policy_config = interaction_config.policy
         total_int_steps = policy_config.num_control_steps * policy_config.num_int_step_between_nodes
         self.inner_dt = total_time / total_int_steps
-        self.sac_config = dict(num_timesteps=1000, num_evals=20, reward_scaling=10,
+        self.sac_config = dict(num_timesteps=30_000, num_evals=20, reward_scaling=10,
                                episode_length=policy_config.num_control_steps,
                                normalize_observations=True, action_repeat=1, discounting=0.999, lr_policy=3e-4,
                                lr_alpha=3e-4, lr_q=3e-4, num_envs=16, batch_size=64, grad_updates_per_step=32,

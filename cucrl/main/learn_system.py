@@ -476,10 +476,10 @@ class LearnSystem:
             self.data_generator.simulator.interactor.update(dynamics_model=dynamics_model, key=key)
             print('Time spent for trajectory optimization: {} seconds'.format(
                 time.time() - start_time_trajectory_optimization))
-           # # TODO: uncomment the next 3 lines!!
-           #  self.offline_planning_data = self.data_generator.simulator.interactor.offline_planning_data
-           #  if self.visualization and self.track_wandb:
-           #      self.visualize_controller(offline_planning_data=self.offline_planning_data, episode=episode)
+            # # TODO: uncomment the next 3 lines!!
+            #  self.offline_planning_data = self.data_generator.simulator.interactor.offline_planning_data
+            #  if self.visualization and self.track_wandb:
+            #      self.visualize_controller(offline_planning_data=self.offline_planning_data, episode=episode)
             # We copy parameters of the last state since we need them for the next iteration
             for key, value in copy.deepcopy(self.parameters).items():
                 self.old_parameters[key] = value

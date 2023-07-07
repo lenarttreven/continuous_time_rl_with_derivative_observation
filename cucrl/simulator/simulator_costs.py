@@ -130,21 +130,26 @@ class Pendulum(SimulatorCostsAndConstraints):
                               r=self.running_r)
 
     def _terminal_cost(self, x, u):
+        u = 4 * u
         return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.terminal_q,
                               r=self.terminal_r)
 
     def _terminal_cost_mpc(self, x, u):
+        u = 4 * u
         return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.terminal_q_mpc,
                               r=self.terminal_r)
 
     def _inequality(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        u = 4 * u
         return jnp.array([0.0])
 
     def _tracking_running_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        u = 4 * u
         return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
                               u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q, r=self.tracking_r)
 
     def _tracking_terminal_cost(self, x: jnp.ndarray, u: jnp.ndarray) -> jnp.ndarray:
+        u = 4 * u
         return quadratic_cost(x, u, x_target=jnp.zeros(shape=(self.state_dim,)),
                               u_target=jnp.zeros(shape=(self.control_dim,)), q=self.tracking_q_T, r=self.tracking_r_T)
 

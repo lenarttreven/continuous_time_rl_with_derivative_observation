@@ -80,6 +80,7 @@ class Pendulum(SimulatorDynamics):
                          state_scaling=state_scaling, control_scaling=control_scaling)
 
     def _dynamics(self, x, u, t):
+        u = 4 * u
         return jnp.array([x[1], self.system_params[1] / self.system_params[0] * jnp.sin(x[0]) + u.reshape()])
 
 
