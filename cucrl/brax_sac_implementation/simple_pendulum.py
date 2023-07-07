@@ -9,7 +9,7 @@ from flax import struct
 from jax import jit
 from jax import numpy as jnp
 
-from brax_sac_implementation.sac import SAC
+from cucrl.brax_sac_implementation.sac import SAC
 
 if __name__ == '__main__':
     wandb.init(
@@ -50,7 +50,7 @@ if __name__ == '__main__':
         plt.show()
 
 
-    make_inference_fn, params, _ = sac_trainer.run_training(key=jr.PRNGKey(0), progress_fn=progress)
+    make_inference_fn, params, _ = sac_trainer.run_training(key=jr.PRNGKey(0))
 
     print(f'time to jit: {times[1] - times[0]}')
     print(f'time to train: {times[-1] - times[1]}')

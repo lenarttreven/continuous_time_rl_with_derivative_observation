@@ -24,7 +24,7 @@ import jax.numpy as jnp
 from brax.training import types
 from brax.training.types import Params
 
-from brax_sac_implementation.sac_networks import SACNetworks
+from cucrl.brax_sac_implementation.sac_networks import SACNetworks
 
 Transition = types.Transition
 

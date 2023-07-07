@@ -5,6 +5,7 @@ from jax import numpy as jnp
 from cucrl.dynamics_with_control.dynamics_models import AbstractDynamics
 from cucrl.simulator.simulator_costs import SimulatorCostsAndConstraints
 from cucrl.utils.classes import DynamicsModel
+from cucrl.utils.helper_functions import AngleNormalizer
 
 
 class LearnedModel(Env):
@@ -14,12 +15,14 @@ class LearnedModel(Env):
                  dynamics_model: AbstractDynamics,
                  dynamics_params: DynamicsModel,
                  sim_cost: SimulatorCostsAndConstraints,
-                 backend: str = 'string', ):
+                 angle_normalizer: AngleNormalizer,
+                 backend: str = 'string'):
         # The dynamics model that we design needs to have actions bounded to [-1, 1]
         self._dt = dt
         self._backend = backend
         self._dynamics_model = dynamics_model
         self._dynamics_params = dynamics_params
+        self.angle_normalizer = angle_normalizer
         self.sim_cost = sim_cost
 
     def _ode(self, x: chex.Array, u: chex.Array) -> chex.Array:
@@ -55,7 +58,7 @@ class LearnedModel(Env):
         x = state.obs
         u = action
         x_next = x + self._dt * self._ode(x, u)
-        # Todo: potentially we need to convert angles here
+        x_next = self.angle_normalizer.transform_x(x_next)
         reward, done = self.reward(x, u), jnp.array(0.0)
         return state.replace(obs=x_next, reward=reward, done=done)
 

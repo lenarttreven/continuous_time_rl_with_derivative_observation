@@ -24,9 +24,9 @@ from jax.lax import scan
 from jaxtyping import PyTree
 
 import wandb
-from brax_sac_implementation.losses import SACLosses
-from brax_sac_implementation.sac_networks import SACNetworksModel, make_inference_fn
-from brax_sac_implementation.utils import gradient_update_fn, metrics_to_float
+from cucrl.brax_sac_implementation.losses import SACLosses
+from cucrl.brax_sac_implementation.sac_networks import SACNetworksModel, make_inference_fn
+from cucrl.brax_sac_implementation.utils import gradient_update_fn, metrics_to_float
 
 Metrics = types.Metrics
 Transition = types.Transition
