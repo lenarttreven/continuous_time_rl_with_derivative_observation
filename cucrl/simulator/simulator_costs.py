@@ -39,8 +39,8 @@ class SimulatorCostsAndConstraints(ABC):
         self._x0: chex.Array | None = None
 
     def get_x0(self) -> chex.Array:
-        assert self._x0.shape == (self.state_dim,)
-        return self._x0
+        assert self._get_x0().shape == (self.state_dim,)
+        return self._get_x0()
 
     @abstractmethod
     def _get_x0(self) -> chex.Array:
@@ -121,6 +121,9 @@ class Pendulum(SimulatorCostsAndConstraints):
         self.tracking_r = 0.01 * jnp.eye(self.control_dim)
         self.tracking_q_T = jnp.eye(self.state_dim)
         self.tracking_r_T = 0 * jnp.eye(self.control_dim)
+
+    def _get_x0(self) -> chex.Array:
+        return jnp.array([jnp.pi, 0.0], dtype=jnp.float64)
 
     def _running_cost(self, x, u):
         return quadratic_cost(x, u, x_target=self.state_target, u_target=self.action_target, q=self.running_q,

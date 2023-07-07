@@ -131,7 +131,7 @@ class CollectorCarry(NamedTuple):
 
 class IntegrationCarry(NamedTuple):
     collector_carry: CollectorCarry = CollectorCarry()
-    mpc_carry: MPCCarry = MPCCarry()
+    mpc_carry: MPCCarry | None = MPCCarry()
 
 
 class OCSolution(NamedTuple):

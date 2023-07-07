@@ -130,7 +130,7 @@ class LearnSystem:
     def _prepare_controller(self, control_options, initial_condition):
         self.policy = get_interactor(self.x_dim, self.u_dim, self.dynamics, initial_condition,
                                      self.normalizer,
-                                     self.angle_layer, control_options, self.offline_planner,
+                                     self.angle_layer, control_options, self.simulator_costs,
                                      self.config.data_generator.simulator.scaling)
 
     def compute_optimal_cost(self, control_options, initial_condition):
@@ -143,8 +143,13 @@ class LearnSystem:
                                         dynamics=true_dynamics_wrapper, simulator_costs=self.simulator_costs,
                                         policy_config=self.interaction.policy)
 
+        # # This is for the case when we have a MPC planner
+        # true_policy = get_interactor(self.x_dim, self.u_dim, true_dynamics_wrapper, initial_condition,
+        #                              self.normalizer, self.angle_layer, control_options, offline_planner,
+        #                              self.config.data_generator.simulator.scaling)
+
         true_policy = get_interactor(self.x_dim, self.u_dim, true_dynamics_wrapper, initial_condition,
-                                     self.normalizer, self.angle_layer, control_options, offline_planner,
+                                     self.normalizer, self.angle_layer, control_options, self.simulator_costs,
                                      self.config.data_generator.simulator.scaling)
 
         true_data_gen = DataGenerator(data_generation=self.config.data_generator, interactor=true_policy)
@@ -471,9 +476,10 @@ class LearnSystem:
             self.data_generator.simulator.interactor.update(dynamics_model=dynamics_model, key=key)
             print('Time spent for trajectory optimization: {} seconds'.format(
                 time.time() - start_time_trajectory_optimization))
-            self.offline_planning_data = self.data_generator.simulator.interactor.offline_planning_data
-            if self.visualization and self.track_wandb:
-                self.visualize_controller(offline_planning_data=self.offline_planning_data, episode=episode)
+           # # TODO: uncomment the next 3 lines!!
+           #  self.offline_planning_data = self.data_generator.simulator.interactor.offline_planning_data
+           #  if self.visualization and self.track_wandb:
+           #      self.visualize_controller(offline_planning_data=self.offline_planning_data, episode=episode)
             # We copy parameters of the last state since we need them for the next iteration
             for key, value in copy.deepcopy(self.parameters).items():
                 self.old_parameters[key] = value

@@ -8,7 +8,6 @@ from jax import random
 
 from cucrl.main.config import InteractionConfig, Scaling
 from cucrl.main.data_stats import Normalizer
-from cucrl.offline_planner.abstract_offline_planner import AbstractOfflinePlanner
 from cucrl.utils.classes import IntegrationCarry, TrackingData, MPCCarry, DynamicsModel
 from cucrl.utils.classes import OfflinePlanningData
 from cucrl.utils.helper_functions import AngleLayerDynamics
@@ -19,14 +18,12 @@ PolicyOut = Tuple[jax.Array, jax.Array, IntegrationCarry]
 
 class Policy(ABC):
     def __init__(self, x_dim: int, u_dim: int, initial_condition: List[chex.Array], normalizer: Normalizer,
-                 offline_planner: AbstractOfflinePlanner, interaction_config: InteractionConfig,
-                 angle_layer: AngleLayerDynamics, scaling: Scaling):
+                 interaction_config: InteractionConfig, angle_layer: AngleLayerDynamics, scaling: Scaling):
         self.scaling = scaling
         self.x_dim = x_dim
         self.u_dim = u_dim
         self.initial_conditions = jnp.stack(initial_condition)
         self.num_traj = len(self.initial_conditions)
-        self.offline_planner = offline_planner
         self.interaction_config = interaction_config
         self.initial_control = self.prepare_initial_control()
         self.normalizer = normalizer
