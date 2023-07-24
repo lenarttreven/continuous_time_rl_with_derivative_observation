@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
 
     def initial_control(x, t):
-        return 0.1 * jnp.sin(t).reshape(1, )
+        return 0.0 * jnp.sin(t).reshape(1, )
 
 
     run_config = RunConfig(

@@ -22,7 +22,7 @@ from cucrl.utils.representatives import TimeHorizonType, BatchStrategy
 config.update('jax_enable_x64', True)
 
 
-def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: BatchStrategy, project_name: str):
+def experiment(data_seed: jax.random.PRNGKey, measurement_selection_strategy: BatchStrategy, d: str):
     seed = 0
     num_matching_points = 50
     num_visualization_points = 1000
